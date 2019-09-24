@@ -1,0 +1,32 @@
+{
+    "configurations": [
+        {
+            "includePath": [
+                "/usr/local/Cellar/eosio.cdt/1.6.2/opt/eosio.cdt/include",
+                "/usr/local/Cellar/eosio.cdt/1.6.2/opt/eosio.cdt/include/libcxx",
+                "/usr/local/Cellar/eosio.cdt/1.6.2/opt/eosio.cdt/include/eosiolib/core",
+                "/usr/local/Cellar/eosio.cdt/1.6.2/opt/eosio.cdt/include/eosiolib/contracts",
+                "${workspaceFolder}",
+                "${workspaceFolder}/include"
+            ],
+            "libs": [],
+            "codeOptions": [],
+            "testOptions": [],
+            "defines": [],
+            "intelliSenseMode": "clang-x64",
+            "browse": {
+                "path": [
+                    "/usr/local/Cellar/eosio.cdt/1.6.2/opt/eosio.cdt/include",
+                    "/usr/local/Cellar/eosio.cdt/1.6.2/opt/eosio.cdt/include/libcxx",
+                    "/usr/local/Cellar/eosio.cdt/1.6.2/opt/eosio.cdt/include/eosiolib/core",
+                    "/usr/local/Cellar/eosio.cdt/1.6.2/opt/eosio.cdt/include/eosiolib/contracts",
+                    "${workspaceFolder}",
+                    "${workspaceFolder}/include"
+                ],
+                "limitSymbolsToIncludedHeaders": true,
+                "databaseFilename": ""
+            }
+        }
+    ],
+    "version": 4
+}
