@@ -72,7 +72,7 @@ The 12hr high is used to calculate the amount of EOS needed for entries.
 
 - params
   - `string` id
-  - `string` username
+  - `name` username
   - `checksum256` imgHash
   - `name` account
   - `bool` active
@@ -82,7 +82,7 @@ The 12hr high is used to calculate the amount of EOS needed for entries.
     {
         "params": {
             "id": "7f945fdb-50d3-48d2-96e2-30a65268b762",
-            "username": "cryptoCat123",
+            "username": "cryptocat1234",
             "imgHash": "fbea88977ed96d4b1...",
             "account": "bob",
             "active": "true"
@@ -214,7 +214,7 @@ Transfer user's winnings to specified destination.
 **Parameters:**
 - `string` id
 - data
-  - `string` username
+  - `name` username
   - `checksum256` imgHash
   - `name` account *(requires auth of _self)*
   - `bool` active *(requires auth of _self)*
@@ -238,7 +238,7 @@ Transfer user's winnings to specified destination.
 
 **Parameters:**
 - params
-  - `string` username
+  - `name` username
   - `string` id
   - `string` contestId
   - `checksum256` videoHash360p
@@ -268,7 +268,7 @@ Transfer user's winnings to specified destination.
 - Asserts hasn't yet voted for entry within contest
 
 **Parameters:**
-- `string` username
+- `name` username
 - `string` entryId
 
 **Example Data:**
