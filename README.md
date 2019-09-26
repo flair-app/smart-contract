@@ -72,7 +72,7 @@ The 12hr high is used to calculate the amount of EOS needed for entries.
 
 - params
   - `string` id
-  - `name` username
+  - `string` username
   - `checksum256` imgHash
   - `name` account
   - `bool` active
@@ -96,7 +96,7 @@ Transfer user's winnings to specified destination.
 
 **Parameters:**
 - `string` user
-- `account` to
+- `name` to
 - `string` memo
 
 **Example Data:**
@@ -111,7 +111,7 @@ Transfer user's winnings to specified destination.
 **Authorization:** Requires `_self` auth
 
 **Parameters:**
-- `string` id
+- `name` id
 - `string` name
 
 **Example Data:**
@@ -126,8 +126,8 @@ Transfer user's winnings to specified destination.
 
 **Parameters:**
 - params
-  - `string` id
-  - `string` categoryId
+  - `name` id
+  - `name` categoryId
   - `string` name
   - `uint8` maxVideoLength *(specified as seconds)*
   - `uint64` price *(specified in USD as cents)*
@@ -182,7 +182,7 @@ Transfer user's winnings to specified destination.
 
 - `name` id
 - data
-  - `string` categoryId
+  - `name` categoryId
   - `string` name
   - `uint8` maxVideoLength *(specified as seconds)*
   - `uint64` price *(specified in USD as cents)*
@@ -212,9 +212,9 @@ Transfer user's winnings to specified destination.
 - Forces auth of `_self` when parameter `account` or `active` are not null.
 
 **Parameters:**
-- `string` id
+- `name` id
 - data
-  - `name` username
+  - `string` username
   - `checksum256` imgHash
   - `name` account *(requires auth of _self)*
   - `bool` active *(requires auth of _self)*
@@ -238,9 +238,9 @@ Transfer user's winnings to specified destination.
 
 **Parameters:**
 - params
-  - `name` username
-  - `string` id
-  - `string` contestId
+  - `string` username
+  - `name` id
+  - `name` levelId
   - `checksum256` videoHash360p
   - `checksum256` videoHash480p
   - `checksum256` videoHash720p
@@ -251,8 +251,8 @@ Transfer user's winnings to specified destination.
     {
         "params": {
             "username": "cryptocat1234",
-            "id": "c67affd6b631",
-            "contestId": "25ea718c56ec",
+            "id": "c67affd6b631...",
+            "contestId": "25ea718c56ec...",
             "videoHash360p": "7e074460435747efe...",
             "videoHash480p": "61fa79bd6c8ab8593...",
             "videoHash720p": "fa5546d484d063b85...",
@@ -268,7 +268,7 @@ Transfer user's winnings to specified destination.
 - Asserts hasn't yet voted for entry within contest
 
 **Parameters:**
-- `name` username
+- `string` username
 - `string` entryId
 
 **Example Data:**
