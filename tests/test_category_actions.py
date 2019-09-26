@@ -49,7 +49,6 @@ class CategoryActionsUnitTest(unittest.TestCase):
             "archived": False,
         }])
             
-
     def test_create_category_requires_auth_of_self(self):
         with self.assertRaises(MissingRequiredAuthorityError):
             HOST.push_action(

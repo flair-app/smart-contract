@@ -129,11 +129,11 @@ Transfer user's winnings to specified destination.
   - `name` id
   - `name` categoryId
   - `string` name
-  - `uint8` maxVideoLength *(specified as seconds)*
-  - `uint64` price *(specified in USD as cents)*
-  - `uint64` participantLimit
-  - `uint64` submissionPeriod *(specified as hours)*
-  - `uint64` votePeriod *(specified as hours)*
+  - `uint32` maxVideoLength *(specified as seconds)*
+  - `uint32` price *(specified in USD as cents)*
+  - `uint32` participantLimit
+  - `uint32` submissionPeriod *(specified as hours)*
+  - `uint32` votePeriod *(specified as hours)*
 
 **Example Data:**
     
@@ -184,11 +184,12 @@ Transfer user's winnings to specified destination.
 - data
   - `name` categoryId
   - `string` name
-  - `uint8` maxVideoLength *(specified as seconds)*
-  - `uint64` price *(specified in USD as cents)*
-  - `uint64` participantLimit
-  - `uint64` submissionPeriod *(specified as hours)*
-  - `uint64` votePeriod *(specified as hours)*
+  - `bool` archived
+  - `uint32` maxVideoLength *(specified as seconds)*
+  - `uint32` price *(specified in USD as cents)*
+  - `uint32` participantLimit
+  - `uint32` submissionPeriod *(specified as hours)*
+  - `uint32` votePeriod *(specified as hours)*
 
 **Example Data:**
     
@@ -197,6 +198,7 @@ Transfer user's winnings to specified destination.
         "data": {
             "categoryId": "music",
             "name": "Gold",
+            "archived": false,
             "maxVideoLength": 30,
             "price": 1000,
             "participantLimit": 100,
