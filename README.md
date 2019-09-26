@@ -224,7 +224,7 @@ Transfer user's winnings to specified destination.
     {
         "id": "30a65268b762",
         "data": {
-            "username": "cryptoCat123",
+            "username": "cryptocat1234",
             "imgHash": "fbea88977ed96d4b1a43b...",
             "account": "bob",
             "active": true
@@ -250,7 +250,7 @@ Transfer user's winnings to specified destination.
     
     {
         "params": {
-            "username": "cryptoCat123",
+            "username": "cryptocat1234",
             "id": "c67affd6b631",
             "contestId": "25ea718c56ec",
             "videoHash360p": "7e074460435747efe...",
