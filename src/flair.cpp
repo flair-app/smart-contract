@@ -1,10 +1,9 @@
 #include <eosio/eosio.hpp>
 #include <eosio/print.hpp>
+#include <eosio/crypto.hpp>
 #include <string>
 
 using namespace eosio;
-
-
 
 class [[eosio::contract("flair")]] flair : public contract {
   public:
@@ -113,7 +112,95 @@ class [[eosio::contract("flair")]] flair : public contract {
          });
       }
 
+      /*
+         ADD PROFILE
+      */
+      struct addprofargs {
+         name id;
+         std::string username;
+         checksum256 imgHash;
+         name account;
+         bool active;
+      };
+
+      [[eosio::action]]
+      void addprofile(addprofargs params) {
+         require_auth( _self );
+
+         check(checkusername(params.username), "Invalid Username");
+
+         profile_index profiles( _self, _self.value );
+         
+         checksum256 usernameHash = sha256(&params.username[0], params.username.size());
+
+         auto byUsernameHashIdx = profiles.get_index<"byusername"_n>();
+         auto itr = byUsernameHashIdx.find(usernameHash);
+
+         check(itr->username != params.username, "Username already exists.");
+
+         profiles.emplace(_self, [&](profile& row) {
+            row.id = params.id;
+            row.username = params.username;
+            row.usernameHash = usernameHash;
+            row.imgHash = params.imgHash;
+            row.account = params.account;
+            row.active = params.active;
+         });
+      }
+
    private:
+      /*
+         checkusername
+      */
+      bool checkusername(std::string username) {
+         print("checkusername ", username, "\n");
+         // cannot be under 6 char
+         if (username.size() < 6) {
+            print("Username cannot be less than 6 characters.", "\n");
+            return false;
+         }
+         //check(username.size() >= 6, "Username cannot be less than 6 characters.");
+
+         // cannot be over 30 char
+         if (username.size() > 30) {
+            print("Username cannot be more than 30 characters.", "\n");
+            return false;
+         }
+         // check(username.size() <= 30, "Username cannot be more than 30 characters.");
+
+         // only allow alphanumeric and dots (A-Z a-z 0-9 .)
+         // std::regex reg("[\w.]+");
+         // if (std::regex_match(username, reg)) {
+         //    print("Username is limited to containing alphanumeric(A-Z a-z 0-9) and dots(.).");
+         //    return false;
+         // }
+         // check(std::regex_match(username, reg), "Username is limited to containing alphanumeric(A-Z a-z 0-9) and dots(.).");
+
+         // prevent starting or ending with dot
+         if (username.front() == '.') {
+            print("Username cannot start with a dot.", "\n");
+            return false;
+         }
+         // check(username.front() != '.', "Username cannot start with a dot.");
+
+         if (username.back() == '.') {
+            print("Username cannot end with a dot.", "\n");
+            return false;
+         }
+         // check(username.back() != '.', "Username cannot end with a dot.");
+
+         // prevent double dots
+         // std::regex doubleDotReg("(\.\.)");
+         // if (std::regex_match(username, doubleDotReg)) {
+         //    print("Username cannot contain double dots (..).");
+         //    return false;
+         // }
+         // check(!std::regex_match(username, doubleDotReg), "Username cannot contain double dots (..).");
+
+         print("checkusername valid", "\n");
+         return true;
+      }
+
       /*
          TABLE: categories
       */
@@ -145,4 +232,25 @@ class [[eosio::contract("flair")]] flair : public contract {
       };
 
       typedef eosio::multi_index<"levels"_n, level> level_index;
+
+      /*
+         TABLE: profiles
+      */
+      struct [[eosio::table]] profile {
+         name id;
+         std::string username;
+         checksum256 usernameHash;
+         checksum256 imgHash;
+         name account;
+         bool active;
+
+         uint64_t primary_key() const { return id.value; }
+         checksum256 by_username_hash() const { return usernameHash; }
+      };
+
+      typedef eosio::multi_index<
+         "profiles"_n, 
+         profile,
+         indexed_by<"byusername"_n, const_mem_fun<profile, checksum256, &profile::by_username_hash>>
+      > profile_index;
 };
