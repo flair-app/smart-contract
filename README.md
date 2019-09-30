@@ -43,7 +43,8 @@ cleos set contract your_contract_account_name $(pwd)/build -p your_account@activ
   - [**createlevel (Create Level)**](#createlevel-create-level)
   - [**editcat (Edit Category)**](#editcat-edit-category)
   - [**editlevel (Edit Level)**](#editlevel-edit-level)
-  - [**editprofile (Edit Profile)**](#editprofile-edit-profile)
+  - [**editprofadm (Edit Profile as Admin)**](#editprofadm-edit-profile-as-admin)
+  - [**editprofuser (Edit Profile as User)**](#editprofuser-edit-profile-as-user)
   - [**entercontest (Enter Contest)**](#entercontest-enter-contest)
   - [**vote (Vote)**](#vote-vote)
 
