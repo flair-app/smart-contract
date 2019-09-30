@@ -145,9 +145,9 @@ class ProfileActionsUnitTest(unittest.TestCase):
             "test,test", # can not contain comma
             "test<test", # can not contain brackets
             "test>test", # can not contain brackets
-            "t.e..s.t.e.r", # can not contain double dot
             "t.e.s.t.e.r.", # can not end with dot
             ".t.e.s.t.e.r", # can not start with dot
+            "t.e..s.t.e.r", # can not contain double dot
         ]
 
         idPostfix = ""
@@ -156,8 +156,8 @@ class ProfileActionsUnitTest(unittest.TestCase):
         for validUsername in validUsernames:
             idIndex += 1
             if (idIndex > 5):
-                    idPostfix = idPostfix + "5"
-                    idIndex = 1
+                idPostfix = idPostfix + "5"
+                idIndex = 1
             accountname = "acct" + idPostfix + str(idIndex)
             create_account(accountname, MASTER, accountname)
 
@@ -215,22 +215,298 @@ class ProfileActionsUnitTest(unittest.TestCase):
                     }],
                     permission=(HOST, Permission.ACTIVE)
                 )
-                
-    
-    def test_create_profile_require_account_to_be_uniquely_active(self):
-        pass
 
     def test_profile_lookup_by_username(self):
-        pass
+        username = "testusername"
+        HOST.push_action(
+            "addprofile",
+            [{
+                "id":username,
+                "username":username,
+                "imgHash":"950fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9",
+                "account":ALICE,
+                "active":True,
+            }],
+            permission=(HOST, Permission.ACTIVE)
+        )
+
+        usernameHash = hashlib.sha256(username.encode())
+
+        COMMENT(
+            '''
+            usernameHash    : {usernameHash}
+            '''
+            .format(
+                usernameHash=usernameHash.hexdigest(), 
+            )
+        )
+
+        def hexLittleEndian(str):
+            hexLE = ""
+
+            for i in reversed(range(0, 30, 2)):
+                iEnd = i + 1
+                str[i:iEnd]
+                hexLE = hexLE + str
+
+            return hexLE
+
+        def shaKeyEncoding(str):
+            return hexLittleEndian(str[0:15]) + hexLittleEndian(str[16:31])
+
+        tableRes = HOST.table("profiles", HOST, lower=shaKeyEncoding(usernameHash.hexdigest()), limit=1, key_type="sha256", index=2)
+        tableData = json.loads(tableRes.out_msg)
+
+        self.assertEqual(tableData["rows"], [{
+            "id":username,
+            "username":username,
+            "usernameHash":usernameHash.hexdigest(),
+            "imgHash":"950fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9",
+            "account": str(ALICE),
+            "active": 1,
+        }])
 
     def test_edit_profile_modifies_table_when_user_auth(self):
-        pass
+        SCENARIO('''
+        test_edit_profile_modifies_table_when_user_auth
+        ''')
+
+        id = "cryptocat234"
+        username = "cryptocat234"
+        imgHash = "950fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+        usernameEdit = "cryptocat345"
+        imgHashEdit = "850fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+
+        HOST.push_action(
+            "addprofile",
+            [{
+                "id":id,
+                "username":username,
+                "imgHash":imgHash,
+                "account": str(ALICE),
+                "active": True,
+            }],
+            permission=(HOST, Permission.ACTIVE)
+        )
+
+        HOST.push_action(
+            "editprofuser",
+            [
+                id,
+                {
+                    "username":usernameEdit,
+                    "imgHash":imgHashEdit,
+                }
+            ],
+            permission=(ALICE, Permission.ACTIVE)
+        )
+
+        usernameHash = hashlib.sha256(usernameEdit.encode())
+        
+        tableRes = HOST.table("profiles", HOST, lower=id, key_type="name", limit=1)
+        tableData = json.loads(tableRes.out_msg)
+
+        self.assertEqual(tableData["rows"], [{
+            "id":id,
+            "username":usernameEdit,
+            "usernameHash":usernameHash.hexdigest(),
+            "imgHash":imgHashEdit,
+            "account": str(ALICE),
+            "active": 1,
+        }])
+
+    def test_edit_profile_as_user_requires_auth_user(self):
+        id = "testing444"
+        HOST.push_action(
+            "addprofile",
+            [{
+                "id":id,
+                "username":"testing444",
+                "imgHash":"950fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9",
+                "account": str(ALICE),
+                "active": True,
+            }],
+            permission=(HOST, Permission.ACTIVE)
+        )
+
+        with self.assertRaises(MissingRequiredAuthorityError):
+            HOST.push_action(
+                "editprofuser",
+                [
+                    id,
+                    {
+                        "username":"testing444b",
+                        "imgHash":"950fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9",
+                    }
+                ],
+                force_unique=1,
+                permission=(BOB, Permission.ACTIVE)
+            )
+    
+    def test_edit_profile_as_user_ensures_unique_username(self):
+        id = "testing333"
+        HOST.push_action(
+            "addprofile",
+            [{
+                "id":id,
+                "username":"testing333",
+                "imgHash":"950fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9",
+                "account": str(ALICE),
+                "active": True,
+            }],
+            permission=(HOST, Permission.ACTIVE)
+        )
+
+        idb = "testing333b"
+        HOST.push_action(
+            "addprofile",
+            [{
+                "id":idb,
+                "username":"testing333b",
+                "imgHash":"950fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9",
+                "account": str(BOB),
+                "active": True,
+            }],
+            permission=(HOST, Permission.ACTIVE)
+        )
+
+        with self.assertRaises(Error):
+            HOST.push_action(
+                "editprofuser",
+                [
+                    id,
+                    {
+                        "username":"testing333b",
+                        "imgHash":"950fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9",
+                    }
+                ],
+                force_unique=1,
+                permission=(ALICE, Permission.ACTIVE)
+            )
 
     def test_edit_profile_modifies_table_when_admin_auth(self):
-        pass
+        SCENARIO('''
+        test_edit_profile_modifies_table_when_user_auth
+        ''')
 
-    def test_edit_profile_requires_auth_self_when_editing_account_or_active(self):
-        pass
+        id = "555"
+        username = "cryptocat456"
+        imgHash = "950fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+        usernameEdit = "cryptocat567"
+        imgHashEdit = "850fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+
+        HOST.push_action(
+            "addprofile",
+            [{
+                "id":id,
+                "username":username,
+                "imgHash":imgHash,
+                "account": str(ALICE),
+                "active": True,
+            }],
+            permission=(HOST, Permission.ACTIVE)
+        )
+
+        HOST.push_action(
+            "editprofadm",
+            [
+                id,
+                {
+                    "username":usernameEdit,
+                    "imgHash":imgHashEdit,
+                    "account": str(BOB),
+                    "active": False,
+                }
+            ],
+            permission=(HOST, Permission.ACTIVE)
+        )
+
+        usernameHash = hashlib.sha256(usernameEdit.encode())
+        
+        tableRes = HOST.table("profiles", HOST, lower=id, key_type="name", limit=1)
+        tableData = json.loads(tableRes.out_msg)
+
+        self.assertEqual(tableData["rows"], [{
+            "id":id,
+            "username":usernameEdit,
+            "usernameHash":usernameHash.hexdigest(),
+            "imgHash":imgHashEdit,
+            "account": str(BOB),
+            "active": 0,
+        }])
+
+    def test_edit_profile_as_admin_requires_auth_self(self):
+        id = "testing555"
+        HOST.push_action(
+            "addprofile",
+            [{
+                "id":id,
+                "username":"testing555",
+                "imgHash":"950fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9",
+                "account": str(ALICE),
+                "active": True,
+            }],
+            permission=(HOST, Permission.ACTIVE)
+        )
+
+        with self.assertRaises(MissingRequiredAuthorityError):
+            HOST.push_action(
+                "editprofadm",
+                [
+                    id,
+                    {
+                        "username":"testing555b",
+                        "imgHash":"950fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9",
+                        "account": str(BOB),
+                        "active": False,
+                    }
+                ],
+                force_unique=1,
+                permission=(ALICE, Permission.ACTIVE)
+            )
+    
+    def test_edit_profile_as_admin_ensures_unique_username(self):
+        id = "testing222"
+        HOST.push_action(
+            "addprofile",
+            [{
+                "id":id,
+                "username":"testing222",
+                "imgHash":"950fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9",
+                "account": str(ALICE),
+                "active": True,
+            }],
+            permission=(HOST, Permission.ACTIVE)
+        )
+
+        idb = "testing222b"
+        HOST.push_action(
+            "addprofile",
+            [{
+                "id":idb,
+                "username":"testing222b",
+                "imgHash":"950fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9",
+                "account": str(BOB),
+                "active": True,
+            }],
+            permission=(HOST, Permission.ACTIVE)
+        )
+
+        with self.assertRaises(Error):
+            HOST.push_action(
+                "editprofadm",
+                [
+                    id,
+                    {
+                        "username":"testing222b",
+                        "imgHash":"950fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9",
+                        "account": str(ALICE),
+                        "active": True,
+                    }
+                ],
+                force_unique=1,
+                permission=(HOST, Permission.ACTIVE)
+            )
 
     @classmethod
     def tearDownClass(cls):

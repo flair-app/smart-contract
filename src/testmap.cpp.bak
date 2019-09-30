@@ -1,0 +1,35 @@
+#include <eosio/eosio.hpp>
+#include <eosio/print.hpp>
+#include <string>
+#include <unordered_map>
+
+using namespace eosio;
+
+class [[eosio::contract("testmap")]] testmap : public contract {
+  public:
+      using contract::contract;
+
+      /*
+         unorder map test
+      */
+      [[eosio::action]]
+      void hi(std::string username) {
+        // only allow alphanumeric and dots (a-z A-Z 0-9 .)
+        std::unordered_map<char, char> allowedCharactersHash({
+            {'a', 'a'}, {'b', 'b'}, {'c', 'c'}, {'d', 'd'}, {'e', 'e'}, {'f', 'f'}, {'g', 'g'}, {'h', 'h'},
+            {'i', 'i'}, {'j', 'j'}, {'k', 'k'}, {'l', 'l'}, {'m', 'm'}, {'n', 'n'}, {'o', 'o'}, {'p', 'p'},
+            {'q', 'q'}, {'r', 'r'}, {'s', 's'}, {'t', 't'}, {'u', 'u'}, {'v', 'v'}, {'w', 'w'}, {'x', 'x'},
+            {'y', 'y'}, {'z', 'z'}, {'A', 'A'}, {'B', 'B'}, {'C', 'C'}, {'D', 'D'}, {'E', 'E'}, {'F', 'F'},
+            {'G', 'G'}, {'H', 'H'}, {'I', 'I'}, {'J', 'J'}, {'K', 'K'}, {'L', 'L'}, {'M', 'M'}, {'N', 'N'},
+            {'O', 'O'}, {'P', 'P'}, {'Q', 'Q'}, {'R', 'R'}, {'S', 'S'}, {'T', 'T'}, {'U', 'U'}, {'V', 'V'},
+            {'W', 'W'}, {'X', 'X'}, {'Y', 'Y'}, {'Z', 'Z'}, {'1', '1'}, {'2', '2'}, {'3', '3'}, {'4', '4'},
+            {'5', '5'}, {'6', '6'}, {'7', '7'}, {'8', '8'}, {'9', '9'}, {'0', '0'}, {'.', '.'}
+        });
+
+        for (char &c: username) {
+            check(allowedCharactersHash.count(c) == 0, "Username is limited to containing alphanumeric(A-Z a-z 0-9) and dots(.).");
+        }
+
+        print("Hello, ", username, "\n");
+      }
+};

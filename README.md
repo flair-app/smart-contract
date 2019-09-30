@@ -207,19 +207,18 @@ Transfer user's winnings to specified destination.
         }
     }
 
-## **editprofile (Edit Profile)**
+## **editprofadm (Edit Profile as Admin)**
 
 **Authorization:**
-- Requires auth of `_self` or the `account` associated to the `uuid` parameter.
-- Forces auth of `_self` when parameter `account` or `active` are not null.
+- Requires auth of `_self`
 
 **Parameters:**
 - `name` id
 - data
   - `string` username
   - `checksum256` imgHash
-  - `name` account *(requires auth of _self)*
-  - `bool` active *(requires auth of _self)*
+  - `name` account
+  - `bool` active
 
 **Example Data:**
     
@@ -230,6 +229,26 @@ Transfer user's winnings to specified destination.
             "imgHash": "fbea88977ed96d4b1a43b...",
             "account": "bob",
             "active": true
+        }
+    }
+
+## **editprofuser (Edit Profile as User)**
+
+**Authorization:** require auth of the `account` associated to the `id` parameter.
+
+**Parameters:**
+- `name` id
+- data
+  - `string` username
+  - `checksum256` imgHash
+
+**Example Data:**
+    
+    {
+        "id": "30a55255b552",
+        "data": {
+            "username": "cryptocat1234",
+            "imgHash": "fbea88977ed96d4b1a43b...",
         }
     }
 
