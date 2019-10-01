@@ -210,6 +210,26 @@ class [[eosio::contract("flair")]] flair : public contract {
          });
       }
 
+      /*
+         SET EOS 12 HOUR HIGH
+      */
+      [[eosio::action]]
+      void seteoshigh(uint64_t time, uint64_t usdHigh) {
+         require_auth(_self);
+
+         eosprice_index eosprices(_self, _self.value);
+         auto price = eosprices.find(time);
+         
+         if(eosprices.begin() != eosprices.end()) {
+            eosprices.erase(eosprices.begin());
+         }
+
+         eosprices.emplace(_self, [&]( eosprice& row ) {
+            row.time = time;
+            row.usdHigh = usdHigh;
+         });
+      }
+
    private:
       bool checkusername(std::string username) {
          print("checkusername ", username, "\n");
@@ -320,4 +340,16 @@ class [[eosio::contract("flair")]] flair : public contract {
          profile,
          indexed_by<"byusername"_n, const_mem_fun<profile, checksum256, &profile::by_username_hash>>
       > profile_index;
+
+      /*
+         TABLE: eosprices
+      */
+      struct [[eosio::table]] eosprice {
+         uint64_t time;
+         uint64_t usdHigh; // represented as one hundredth of a cent ($1.00 * 10000)
+
+         uint64_t primary_key() const { return time; }
+      };
+
+      typedef eosio::multi_index<"eosprices"_n, eosprice> eosprice_index;
 };

@@ -36,7 +36,6 @@ cleos set contract your_contract_account_name $(pwd)/build -p your_account@activ
 ```
 
 # Smart Contract Actions
-  - [**addeoshigh (Update EOS 12 Hour High)**](#addeoshigh-update-eos-12-hour-high)
   - [**addprofile (Add/Create Profile)**](#addprofile-addcreate-profile)
   - [**claimfunds (Claim Funds)**](#claimfunds-claim-funds)
   - [**createcat (Create Category)**](#createcat-create-category)
@@ -46,25 +45,8 @@ cleos set contract your_contract_account_name $(pwd)/build -p your_account@activ
   - [**editprofadm (Edit Profile as Admin)**](#editprofadm-edit-profile-as-admin)
   - [**editprofuser (Edit Profile as User)**](#editprofuser-edit-profile-as-user)
   - [**entercontest (Enter Contest)**](#entercontest-enter-contest)
+  - [**seteoshigh (Set EOS 12 Hour High)**](#seteoshigh-set-eos-12-hour-high)
   - [**vote (Vote)**](#vote-vote)
-
-
-## **addeoshigh (Update EOS 12 Hour High)**
-
-The 12hr high is used to calculate the amount of EOS needed for entries.
-
-**Authorization:** Requires `_self` auth
-
-**Parameters:**
-- `uint64` time *(ms since epoch)*
-- `uint64` usdHigh
-
-**Example Data:**
-    
-    {
-        "time": 1568751673935, 
-        "usdHigh": 4.18
-    }
 
 ## **addprofile (Add/Create Profile)**
 **Authorization:** Requires `_self` auth
@@ -280,6 +262,23 @@ Transfer user's winnings to specified destination.
             "videoHash720p": "fa5546d484d063b85...",
             "videoHash1080p": "d7328edbe89e6e12..."
         }
+    }
+
+## **seteoshigh (Set EOS 12 Hour High)**
+
+The 12hr high is used to calculate the amount of EOS needed for entries.
+
+**Authorization:** Requires `_self` auth
+
+**Parameters:**
+- `uint64` time *(ms since epoch)*
+- `uint64` usdHigh *(represented as one hundredth of a cent, 10000 = $1.00 * 10000)*
+
+**Example Data:**
+    
+    {
+        "time": 1568751673935, 
+        "usdHigh": 4.18
     }
 
 ## **vote (Vote)**
