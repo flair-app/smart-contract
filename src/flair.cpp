@@ -1,6 +1,7 @@
 #include <eosio/eosio.hpp>
 #include <eosio/print.hpp>
 #include <eosio/crypto.hpp>
+#include <eosio/system.hpp>
 #include <string>
 #include <map>
 
@@ -214,19 +215,42 @@ class [[eosio::contract("flair")]] flair : public contract {
          SET EOS 12 HOUR HIGH
       */
       [[eosio::action]]
-      void seteoshigh(uint64_t time, uint64_t usdHigh) {
+      void addeoshigh(uint64_t openTime, uint64_t usdHigh, uint64_t intervalSec) {
          require_auth(_self);
 
+         uint64_t curEpoch = eosio::current_time_point().sec_since_epoch();
+         uint64_t EOSPriceStoreLifeSec = 12 * 3600;
+         uint64_t EOSPriceExpTime = curEpoch - EOSPriceStoreLifeSec;
+
+         check(openTime > EOSPriceExpTime, "Open time must be within last 12 hours");
+
          eosprice_index eosprices(_self, _self.value);
-         auto price = eosprices.find(time);
          
-         if(eosprices.begin() != eosprices.end()) {
-            eosprices.erase(eosprices.begin());
+         // DELETE EXPIRED PRICES
+         auto oldPriceIter = eosprices.lower_bound(EOSPriceExpTime);
+         bool done = false;
+         while(
+            !done
+            && oldPriceIter != eosprices.end()
+         ) {
+            if (oldPriceIter == eosprices.begin()) {
+               done = true;
+            }
+
+            bool isPriceExpired = oldPriceIter->openTime < EOSPriceExpTime;
+            if(isPriceExpired) {
+               print("(Notice) Expired EOS Price found: erase ", oldPriceIter->openTime, "\n");
+               oldPriceIter = eosprices.erase(oldPriceIter);
+            } else if(oldPriceIter != eosprices.begin()) {
+               oldPriceIter--;
+            }
          }
 
+         // ADD NEW PRICE
          eosprices.emplace(_self, [&]( eosprice& row ) {
-            row.time = time;
+            row.openTime = openTime;
             row.usdHigh = usdHigh;
+            row.intervalSec = intervalSec;
          });
       }
 
@@ -345,10 +369,11 @@ class [[eosio::contract("flair")]] flair : public contract {
          TABLE: eosprices
       */
       struct [[eosio::table]] eosprice {
-         uint64_t time;
+         uint64_t openTime;
          uint64_t usdHigh; // represented as one hundredth of a cent ($1.00 * 10000)
+         uint64_t intervalSec;
 
-         uint64_t primary_key() const { return time; }
+         uint64_t primary_key() const { return openTime; }
       };
 
       typedef eosio::multi_index<"eosprices"_n, eosprice> eosprice_index;
