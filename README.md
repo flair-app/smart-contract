@@ -4,7 +4,6 @@ You'll need the following items installed:
 - [eosio.cdt v1.6.1](https://developers.eos.io/eosio-home/docs/installing-the-contract-development-toolkit)
 - Python 3.5 or higher
 - pip3 18.1 or higher
-- CMake 3.5 or higher
 - [EOSFactory](https://eosfactory.io/build/html/tutorials/01.InstallingEOSFactory.html)
 
 # Tests
@@ -19,7 +18,7 @@ python3 -m unittest discover --pattern=*.py
 **Run A Specific Test**
 ```
 cd tests
-python3 -m unittest discover --pattern=filename.py
+python3 -m unittest discover --pattern=test_addeoshigh.py
 ```
 
 # Building
@@ -36,6 +35,7 @@ cleos set contract your_contract_account_name $(pwd)/build -p your_account@activ
 ```
 
 # Smart Contract Actions
+  - [**addeoshigh (Set EOS 12 Hour High)**](#addeoshigh-set-eos-12-hour-high)
   - [**addprofile (Add/Create Profile)**](#addprofile-addcreate-profile)
   - [**claimfunds (Claim Funds)**](#claimfunds-claim-funds)
   - [**createcat (Create Category)**](#createcat-create-category)
@@ -45,8 +45,26 @@ cleos set contract your_contract_account_name $(pwd)/build -p your_account@activ
   - [**editprofadm (Edit Profile as Admin)**](#editprofadm-edit-profile-as-admin)
   - [**editprofuser (Edit Profile as User)**](#editprofuser-edit-profile-as-user)
   - [**entercontest (Enter Contest)**](#entercontest-enter-contest)
-  - [**seteoshigh (Set EOS 12 Hour High)**](#seteoshigh-set-eos-12-hour-high)
   - [**vote (Vote)**](#vote-vote)
+
+## **addeoshigh (Add EOS High)**
+
+Keeps a list of eos highs for 12 hours. The collection of the eos price high is used to calculate the amount of EOS needed for entries.
+
+**Authorization:** Requires `_self` auth
+
+**Parameters:**
+- `uint64` openTime *(ms since epoch)*
+- `uint64` usdHigh *(represented as one hundredth of a cent, 10000 = $1.00 * 10000)*
+- `uint64` intervalSec *(the period in which the high is measured)*
+
+**Example Data:**
+    
+    {
+        "time": 1568751673935, 
+        "usdHigh": 4.18,
+        "intervalSec": 60
+    }
 
 ## **addprofile (Add/Create Profile)**
 **Authorization:** Requires `_self` auth
@@ -262,23 +280,6 @@ Transfer user's winnings to specified destination.
             "videoHash720p": "fa5546d484d063b85...",
             "videoHash1080p": "d7328edbe89e6e12..."
         }
-    }
-
-## **seteoshigh (Set EOS 12 Hour High)**
-
-The 12hr high is used to calculate the amount of EOS needed for entries.
-
-**Authorization:** Requires `_self` auth
-
-**Parameters:**
-- `uint64` time *(ms since epoch)*
-- `uint64` usdHigh *(represented as one hundredth of a cent, 10000 = $1.00 * 10000)*
-
-**Example Data:**
-    
-    {
-        "time": 1568751673935, 
-        "usdHigh": 4.18
     }
 
 ## **vote (Vote)**
