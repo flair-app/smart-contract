@@ -178,6 +178,7 @@ class ContestActionsUnitTest(unittest.TestCase):
             {
                 "id":"music",
                 "name":"Music",
+                "maxVideoLength": 30,
             }, 
             permission=(HOST, Permission.ACTIVE)
         )
@@ -234,7 +235,6 @@ class ContestActionsUnitTest(unittest.TestCase):
                 "id":self.levelId,
                 "name":"Gold",
                 "categoryId": "music",
-                "maxVideoLength": 30,
                 "price": 1000,
                 "participantLimit": 2,
                 "submissionPeriod": 5,

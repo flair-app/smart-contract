@@ -17,7 +17,7 @@ class [[eosio::contract("flair")]] flair : public contract {
          CREATE CATEGORY
       */
       [[eosio::action]]
-      void createcat(name id,  std::string name) {
+      void createcat(name id,  std::string name, uint32_t maxVideoLength) {
          require_auth( _self );
 
          category_index categories( _self, _self.value );
@@ -25,6 +25,7 @@ class [[eosio::contract("flair")]] flair : public contract {
          categories.emplace(_self, [&](category& row) {
             row.id = id;
             row.name = name;
+            row.maxVideoLength = maxVideoLength;
             row.archived = false;
          });
       }
@@ -34,6 +35,7 @@ class [[eosio::contract("flair")]] flair : public contract {
       */
       struct editcatargs {
          std::string name;
+         uint32_t maxVideoLength;
          bool archived;
       };
 
@@ -47,6 +49,7 @@ class [[eosio::contract("flair")]] flair : public contract {
          categories.modify(iterator, _self, [&](category& row) {
             row.id = id;
             row.name = data.name;
+            row.maxVideoLength = data.maxVideoLength;
             row.archived = data.archived;
          });
       }
@@ -58,7 +61,6 @@ class [[eosio::contract("flair")]] flair : public contract {
          name id;
          name categoryId;
          std::string name;
-         uint32_t maxVideoLength;
          uint32_t price;
          uint32_t participantLimit;
          uint32_t submissionPeriod;
@@ -75,7 +77,6 @@ class [[eosio::contract("flair")]] flair : public contract {
             row.id = params.id;
             row.categoryId = params.categoryId;
             row.name = params.name;
-            row.maxVideoLength = params.maxVideoLength;
             row.price = params.price;
             row.participantLimit = params.participantLimit;
             row.submissionPeriod = params.submissionPeriod;
@@ -90,7 +91,6 @@ class [[eosio::contract("flair")]] flair : public contract {
       struct editlevelargs {
          std::string name;
          bool archived;
-         uint32_t maxVideoLength;
          uint32_t price;
          uint32_t participantLimit;
          uint32_t submissionPeriod;
@@ -108,7 +108,6 @@ class [[eosio::contract("flair")]] flair : public contract {
             row.id = id;
             row.name = data.name;
             row.archived = data.archived;
-            row.maxVideoLength = data.maxVideoLength;
             row.price = data.price;
             row.participantLimit = data.participantLimit;
             row.submissionPeriod = data.submissionPeriod;
@@ -568,6 +567,7 @@ class [[eosio::contract("flair")]] flair : public contract {
       struct [[eosio::table]] category {
          name id;
          std::string name;
+         uint32_t maxVideoLength;
          bool archived;
 
          uint64_t primary_key() const { return id.value; }
@@ -583,7 +583,6 @@ class [[eosio::contract("flair")]] flair : public contract {
          name categoryId;
          std::string name;
          bool archived;
-         uint32_t maxVideoLength;
          uint32_t price;
          uint32_t participantLimit;
          uint32_t submissionPeriod;

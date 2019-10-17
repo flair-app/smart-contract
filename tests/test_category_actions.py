@@ -36,6 +36,7 @@ class CategoryActionsUnitTest(unittest.TestCase):
             {
                 "id":"music",
                 "name":"Music",
+                "maxVideoLength": 30,
             }, 
             permission=(HOST, Permission.ACTIVE)
         )
@@ -46,6 +47,7 @@ class CategoryActionsUnitTest(unittest.TestCase):
         self.assertEqual(catData["rows"], [{
             "id":"music",
             "name":"Music",
+            "maxVideoLength": 30,
             "archived": False,
         }])
             
@@ -56,6 +58,7 @@ class CategoryActionsUnitTest(unittest.TestCase):
                 {
                     "id":"music",
                     "name":"Music",
+                    "maxVideoLength": 30,
                 }, 
                 permission=(ALICE, Permission.ACTIVE)
             )
@@ -66,6 +69,7 @@ class CategoryActionsUnitTest(unittest.TestCase):
             {
                 "id":"music2",
                 "name":"Music 2a",
+                "maxVideoLength": 30,
             }, 
             permission=(HOST, Permission.ACTIVE),
             force_unique=1
@@ -77,6 +81,7 @@ class CategoryActionsUnitTest(unittest.TestCase):
                 {
                     "id":"music2",
                     "name":"Music 2b",
+                    "maxVideoLength": 30,
                 }, 
                 permission=(HOST, Permission.ACTIVE),
                 force_unique=1
@@ -88,6 +93,7 @@ class CategoryActionsUnitTest(unittest.TestCase):
             {
                 "id":"editexample",
                 "name":"Edit Example 1",
+                "maxVideoLength": 30,
             },
             permission=(HOST, Permission.ACTIVE)
         )
@@ -98,6 +104,7 @@ class CategoryActionsUnitTest(unittest.TestCase):
                 "id":"editexample",
                 "data": {
                     "name":"Edit Example 2",
+                    "maxVideoLength": 20,
                     "archived": True,
                 },
             },
@@ -110,6 +117,7 @@ class CategoryActionsUnitTest(unittest.TestCase):
         self.assertEqual(catData["rows"], [{
             "id":"editexample",
             "name":"Edit Example 2",
+            "maxVideoLength": 20,
             "archived": True,
         }])
 
@@ -121,6 +129,7 @@ class CategoryActionsUnitTest(unittest.TestCase):
                     "id":"music",
                     "data": {
                         "name":"Music",
+                        "maxVideoLength": 20,
                         "archived": False,
                     },
                 },
