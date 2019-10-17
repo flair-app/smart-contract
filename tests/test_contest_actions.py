@@ -37,6 +37,13 @@ class ContestActionsUnitTest(unittest.TestCase):
         smart.build()
         smart.deploy()
 
+        # set eosio.code permission to contract
+        HOST.set_account_permission(
+            permission_name=Permission.ACTIVE, 
+            add_code=True,
+            permission=(HOST, Permission.OWNER)
+        )
+
         create_account("ALICE", MASTER)
         create_account("BOB", MASTER)
         create_account("CAROL", MASTER)
@@ -183,13 +190,42 @@ class ContestActionsUnitTest(unittest.TestCase):
             permission=(HOST, Permission.ACTIVE)
         )
 
+    def setUp(self):
+        time.sleep(1)
+
+        allowChar = "abcdefghijklmnopqrstuvwxyz12345."
+        
+        randomId = ""
+        for i in range(0, 11):
+            randomCharIndex = random.randrange(0,31,1)
+            randomId += allowChar[randomCharIndex]
+        
+        self.levelId = randomId
+        
         HOST.push_action(
-            "addeoshigh",
-            {
-                "openTime": int(time.time()) - 5,
-                "usdHigh": 10000, # $1.0000
-                "intervalSec": 5, # 5 seconds
-            },
+            "createlevel", 
+            [{
+                "id":self.levelId,
+                "name":"Gold",
+                "categoryId": "music",
+                "price": 1000,
+                "participantLimit": 2,
+                "submissionPeriod": 2,
+                "votePeriod": 2
+            }], 
+            permission=(HOST, Permission.ACTIVE)
+        )
+
+        HOST.push_action(
+            "setentryexp",
+            [2],
+            permission=(HOST, Permission.ACTIVE),
+            force_unique=1
+        )
+
+        HOST.push_action(
+            "setpricefrsh",
+            [2],
             permission=(HOST, Permission.ACTIVE),
             force_unique=1
         )
@@ -199,48 +235,10 @@ class ContestActionsUnitTest(unittest.TestCase):
             {
                 "openTime": int(time.time()),
                 "usdHigh": 50000, # $5.0000
-                "intervalSec": 5, # 5 seconds
+                "intervalSec": 2, # 2 seconds
             },
             permission=(HOST, Permission.ACTIVE),
             force_unique=1
-        )
-
-        HOST.push_action(
-            "setentryexp",
-            [5],
-            permission=(HOST, Permission.ACTIVE),
-            force_unique=1
-        )
-
-        HOST.push_action(
-            "setpricefrsh",
-            [5],
-            permission=(HOST, Permission.ACTIVE),
-            force_unique=1
-        )
-
-    def setUp(self):
-        allowChar = "abcdefghijklmnopqrstuvwxyz12345."
-        
-        randomId = ""
-        for i in range(0, 11):
-            randomCharIndex = random.randrange(0,31,1)
-            randomId += allowChar[randomCharIndex]
-        
-        self.levelId = randomId
-
-        HOST.push_action(
-            "createlevel", 
-            [{
-                "id":self.levelId,
-                "name":"Gold",
-                "categoryId": "music",
-                "price": 1000,
-                "participantLimit": 2,
-                "submissionPeriod": 5,
-                "votePeriod": 5
-            }], 
-            permission=(HOST, Permission.ACTIVE)
         )
     
     def test_enter_contest_saves_fields_into_table(self):
@@ -427,8 +425,8 @@ class ContestActionsUnitTest(unittest.TestCase):
         self.assertEqual(contestData["price"], 1000)
         self.assertEqual(contestData["participantLimit"], 2)
         self.assertEqual(contestData["participantCount"], 1)
-        self.assertEqual(contestData["submissionPeriod"], 5)
-        self.assertEqual(contestData["votePeriod"], 5)
+        self.assertEqual(contestData["submissionPeriod"], 2)
+        self.assertEqual(contestData["votePeriod"], 2)
 
         now = int(time.time())
         self.assertLessEqual(contestData["createdAt"], now + 1)
@@ -477,8 +475,8 @@ class ContestActionsUnitTest(unittest.TestCase):
         self.assertEqual(contestData["price"], 1000)
         self.assertEqual(contestData["participantLimit"], 2)
         self.assertEqual(contestData["participantCount"], 2)
-        self.assertEqual(contestData["submissionPeriod"], 5)
-        self.assertEqual(contestData["votePeriod"], 5)
+        self.assertEqual(contestData["submissionPeriod"], 2)
+        self.assertEqual(contestData["votePeriod"], 2)
 
         now = int(time.time())
         self.assertLessEqual(contestData["createdAt"], now + 1)
@@ -528,22 +526,22 @@ class ContestActionsUnitTest(unittest.TestCase):
         self.assertEqual(contestData["price"], 1000)
         self.assertEqual(contestData["participantLimit"], 2)
         self.assertEqual(contestData["participantCount"], 1)
-        self.assertEqual(contestData["submissionPeriod"], 5)
-        self.assertEqual(contestData["votePeriod"], 5)
+        self.assertEqual(contestData["submissionPeriod"], 2)
+        self.assertEqual(contestData["votePeriod"], 2)
 
         now = int(time.time())
         self.assertLessEqual(contestData["createdAt"], now + 1)
         self.assertGreaterEqual(contestData["createdAt"], now - 1)
 
         # verify creates new contest when existing is no longer accepting submissions
-        time.sleep(6)
+        time.sleep(3)
 
         HOST.push_action(
             "addeoshigh",
             {
                 "openTime": int(time.time()),
                 "usdHigh": 50000, # $5.0000
-                "intervalSec": 5, # 5 seconds
+                "intervalSec": 2, # 2 seconds
             },
             permission=(HOST, Permission.ACTIVE),
             force_unique=1
@@ -592,8 +590,8 @@ class ContestActionsUnitTest(unittest.TestCase):
         self.assertEqual(contestData["price"], 1000)
         self.assertEqual(contestData["participantLimit"], 2)
         self.assertEqual(contestData["participantCount"], 1)
-        self.assertEqual(contestData["submissionPeriod"], 5)
-        self.assertEqual(contestData["votePeriod"], 5)
+        self.assertEqual(contestData["submissionPeriod"], 2)
+        self.assertEqual(contestData["votePeriod"], 2)
 
         now = int(time.time())
         entry4CreatedAt = contestData["createdAt"]
@@ -626,8 +624,8 @@ class ContestActionsUnitTest(unittest.TestCase):
         self.assertEqual(contestData["price"], 1000)
         self.assertEqual(contestData["participantLimit"], 2)
         self.assertEqual(contestData["participantCount"], 1)
-        self.assertEqual(contestData["submissionPeriod"], 5)
-        self.assertEqual(contestData["votePeriod"], 5)
+        self.assertEqual(contestData["submissionPeriod"], 2)
+        self.assertEqual(contestData["votePeriod"], 2)
 
         now = int(time.time())
         self.assertEqual(contestData["createdAt"], entry4CreatedAt)
@@ -663,18 +661,7 @@ class ContestActionsUnitTest(unittest.TestCase):
             permission=(ALICE, Permission.ACTIVE)
         )
 
-        time.sleep(6)
-
-        HOST.push_action(
-            "addeoshigh",
-            {
-                "openTime": int(time.time()),
-                "usdHigh": 50000, # $5.0000
-                "intervalSec": 5, # 5 seconds
-            },
-            permission=(HOST, Permission.ACTIVE),
-            force_unique=1
-        )
+        time.sleep(3)
 
         TOKENHOST.push_action(
             "transfer",
@@ -755,27 +742,14 @@ class ContestActionsUnitTest(unittest.TestCase):
         #set entry exp forward from price freshness to ensure price freshness check
         HOST.push_action(
             "setentryexp",
-            [10],
+            [2000],
             permission=(HOST, Permission.ACTIVE),
             force_unique=1
         )
 
         HOST.push_action(
             "setpricefrsh",
-            [5],
-            permission=(HOST, Permission.ACTIVE),
-            force_unique=1
-        )
-        
-        time.sleep(1)
-
-        HOST.push_action(
-            "addeoshigh",
-            {
-                "openTime": int(time.time()),
-                "usdHigh": 50000, # $5.0000
-                "intervalSec": 2, # 2 seconds
-            },
+            [1],
             permission=(HOST, Permission.ACTIVE),
             force_unique=1
         )
@@ -796,7 +770,7 @@ class ContestActionsUnitTest(unittest.TestCase):
             permission=(ALICE, Permission.ACTIVE)
         )
 
-        time.sleep(8)
+        time.sleep(3)
 
         TOKENHOST.push_action(
             "transfer",
@@ -840,6 +814,8 @@ class ContestActionsUnitTest(unittest.TestCase):
             }],
             permission=(ALICE, Permission.ACTIVE)
         )
+
+        HOST.table("eosprices", HOST, limit=100)
 
         TOKENHOST.push_action(
             "transfer",
@@ -905,7 +881,7 @@ class ContestActionsUnitTest(unittest.TestCase):
             permission=(ALICE, Permission.ACTIVE)
         )
 
-        time.sleep(11)
+        time.sleep(5)
 
         HOST.push_action(
             "addeoshigh",
@@ -952,6 +928,108 @@ class ContestActionsUnitTest(unittest.TestCase):
         self.assertEqual(entry["amount"], 20000)
         contestId = entry["contestId"]
         self.assertNotEqual(contestId, 0)
+
+    def test_refund_entry_payment_sends_funds(self):
+        videoHash360p = "150fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+        videoHash480p = "250fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+        videoHash720p = "350fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+        videoHash1080p = "450fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+        coverHash = "550fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+
+        id = "myentry11"
+        HOST.push_action(
+            "entercontest",
+            [{
+                "id":id,
+                "userId": self.userId,
+                "levelId": self.levelId,
+                "videoHash360p": videoHash360p,
+                "videoHash480p": videoHash480p,
+                "videoHash720p": videoHash720p,
+                "videoHash1080p": videoHash1080p,
+                "coverHash": coverHash,
+            }],
+            permission=(ALICE, Permission.ACTIVE)
+        )
+
+        accountsRes = TOKENHOST.table("accounts", ALICE)
+        beforeBal = accountsRes.json["rows"][0]["balance"]
+
+        TOKENHOST.push_action(
+            "transfer",
+            {
+                "from": ALICE,
+                "to": HOST,
+                "quantity": "1.0000 EOS",
+                "memo": id,
+            },
+            force_unique=True,
+            permission=(ALICE, Permission.ACTIVE)
+        )
+
+        HOST.push_action(
+            "refundentry",
+            {
+                "id":id,
+                "to": ALICE,
+                "memo": "test",
+            },
+            permission=(ALICE, Permission.ACTIVE)
+        )
+
+        entriesRes = HOST.table("entries", HOST, lower=id, key_type="name")
+        entry = entriesRes.json["rows"][0]
+        self.assertEqual(entry["id"], id)
+        self.assertEqual(entry["amount"], 0)
+
+        accountsRes = TOKENHOST.table("accounts", ALICE)
+        self.assertEqual(accountsRes.json["rows"][0]["balance"], beforeBal)
+
+    def test_refund_entry_payment_fails_when_contest_is_set(self):
+        videoHash360p = "150fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+        videoHash480p = "250fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+        videoHash720p = "350fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+        videoHash1080p = "450fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+        coverHash = "550fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+
+        id = "myentry12"
+        HOST.push_action(
+            "entercontest",
+            [{
+                "id":id,
+                "userId": self.userId,
+                "levelId": self.levelId,
+                "videoHash360p": videoHash360p,
+                "videoHash480p": videoHash480p,
+                "videoHash720p": videoHash720p,
+                "videoHash1080p": videoHash1080p,
+                "coverHash": coverHash,
+            }],
+            permission=(ALICE, Permission.ACTIVE)
+        )
+
+        TOKENHOST.push_action(
+            "transfer",
+            {
+                "from": ALICE,
+                "to": HOST,
+                "quantity": "2.0000 EOS",
+                "memo": id,
+            },
+            force_unique=True,
+            permission=(ALICE, Permission.ACTIVE)
+        )
+
+        with self.assertRaises(Error):
+            HOST.push_action(
+                "refundentry",
+                {
+                    "id":id,
+                    "to": ALICE,
+                    "memo": "test",
+                },
+                permission=(ALICE, Permission.ACTIVE)
+            )
 
     @classmethod
     def tearDownClass(cls):

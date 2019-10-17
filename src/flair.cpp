@@ -394,49 +394,23 @@ class [[eosio::contract("flair")]] flair : public contract {
             return;
          }
 
+         // get level interator
+         level_index levels(_self, _self.value);
+         auto levelItr = levels.find(entryItr->levelId.value);
+
+         if (levelItr == levels.end()) {
+            print("Error Creating Contest: could not find level with that id.", "\n");
+            return;
+         }
+
          // get contest interator
          contest_index contests(_self, _self.value);
          auto byLevelIdx = contests.get_index<name("bylevel")>();
          uint64_t submissionsClosed = false;
          auto curContestItr = byLevelIdx.lower_bound(composite_key(entryItr->levelId.value, submissionsClosed));
 
-         // determine eos price high since entry created
-         eosprice_index eosprices(_self, _self.value);
-         auto pricesByEndTime = eosprices.get_index<name("byendtime")>();
-         auto priceItr = pricesByEndTime.lower_bound(entryItr->createdAt);
-
-         uint64_t priceHigh = 0;
-
-         for (auto itr = priceItr; itr != pricesByEndTime.end(); itr++) {
-            print("debug price high: ", priceItr->usdHigh, "\n");
-            if(priceItr->usdHigh > priceHigh) {
-               priceHigh = priceItr->usdHigh;
-            }
-         }
-
-         // mark entry as priceUnavailable if lastest EOS price openTime + intervalSec is older than the set required price freshness
-         price_fresh_index price_fresh_table( _self, _self.value );
-         uint64_t freshTime = price_fresh_table.begin()->freshness;
-         auto lastPrice = --pricesByEndTime.end();
-         bool freshPrice = (lastPrice->openTime + lastPrice->intervalSec) + freshTime > now;
-         // print("priceHigh=", priceHigh, "\n");
-         // print("price fresh debug: freshPrice=", freshPrice," lastEndTime=", lastPrice->openTime + lastPrice->intervalSec, ", freshTime=", freshTime, " | ", lastPrice->openTime + lastPrice->intervalSec + freshTime, " > ", now, "\n");
-         if(priceHigh <= 0 || !freshPrice) {
-            entries.modify(entryItr, _self, [&](contestEntry& row) {
-               row.priceUnavailable = true;
-            });
-
-            print("EOS Price Unavailable: run update action to recheck once price has been updated.\n");
-            return;
-         }
-
-         // fail if quantity is not enough.
-         print("debug price: ", priceHigh, " ", quantity.amount, " ", curContestItr->price, "\n");
-         if (priceHigh * quantity.amount < curContestItr->price * 1000000) {
-            print("Payment not enough only $", (float)(priceHigh * quantity.amount) / 100000000.0,".\n");
-            return;
-         }
-
+         uint64_t contestPrice = 0;
+         
          // print("curContest: ", curContestItr->id, " ", curContestItr->levelId, " ", curContestItr->participantCount, "\n");
          // print("curContest Not End: ", curContestItr != byLevelIdx.end(), "\n");
          // print("levelId Matches: ", curContestItr->levelId == entryItr->levelId, "\n");
@@ -447,6 +421,49 @@ class [[eosio::contract("flair")]] flair : public contract {
             && curContestItr->participantCount < curContestItr->participantLimit
             && now <= curContestItr->createdAt + curContestItr->submissionPeriod
          );
+
+         if (curContestValid) {
+            contestPrice = curContestItr->price;
+         } else {
+            contestPrice = levelItr->price;
+         }
+
+         // determine eos price high since entry created
+         eosprice_index eosprices(_self, _self.value);
+         auto pricesByEndTime = eosprices.get_index<name("byendtime")>();
+         auto priceItr = pricesByEndTime.lower_bound(entryItr->createdAt);
+
+         uint64_t priceHigh = 0;
+
+         for (auto itr = priceItr; itr != pricesByEndTime.end(); itr++) {
+            print("debug price high: ", itr->usdHigh, "\n");
+            if(itr->usdHigh > priceHigh) {
+               priceHigh = itr->usdHigh;
+            }
+         }
+
+         // mark entry as priceUnavailable if lastest EOS price openTime + intervalSec is older than the set required price freshness
+         price_fresh_index price_fresh_table( _self, _self.value );
+         uint64_t freshTime = price_fresh_table.begin()->freshness;
+         auto lastPrice = --pricesByEndTime.end();
+         bool freshPrice = (lastPrice->openTime + lastPrice->intervalSec) + freshTime > now;
+         print("price fresh debug: freshPrice=", freshPrice," lastEndTime=", lastPrice->openTime + lastPrice->intervalSec, ", freshTime=", freshTime, " | ", lastPrice->openTime + lastPrice->intervalSec + freshTime, " > ", now, "\n");
+         if(priceHigh <= 0 || !freshPrice) {
+            entries.modify(entryItr, _self, [&](contestEntry& row) {
+               row.priceUnavailable = true;
+            });
+
+            print("EOS Price Unavailable: run update action to recheck once price has been updated.\n");
+            return;
+         }
+
+         // fail if quantity is not enough.
+         print("debug price: ", priceHigh, " ", quantity.amount, " ", contestPrice, "\n");
+         if (priceHigh * quantity.amount < contestPrice * 1000000) {
+            print("Payment not enough only $", (float)(priceHigh * quantity.amount) / 100000000.0,".\n");
+            return;
+         }
+
          if (curContestValid) {
             entries.modify(entryItr, _self, [&](contestEntry& row) {
                row.contestId = curContestItr->id;
@@ -455,14 +472,6 @@ class [[eosio::contract("flair")]] flair : public contract {
                row.participantCount++;
             });
          } else {
-            level_index levels(_self, _self.value);
-            auto levelItr = levels.find(entryItr->levelId.value);
-
-            if (levelItr == levels.end()) {
-               print("Error Creating Contest: could not find level with that id.", "\n");
-               return;
-            }
-
             uint64_t newContestId = contests.available_primary_key();
             if (newContestId == 0) { newContestId++; }
             print("newContestId: ", newContestId, "\n");
@@ -491,6 +500,40 @@ class [[eosio::contract("flair")]] flair : public contract {
 
             print(entryId, " activated with contest id of ", newContestId, "\n");
          }
+      }
+
+      [[eosio::action]]
+      void refundentry(name id, name to, std::string memo) {
+         entries_index entries(_self, _self.value);
+         auto entryItr = entries.find(id.value);
+
+         profile_index profiles(_self, _self.value);
+         auto userProfile = profiles.find(entryItr->userId.value);
+
+         require_auth( userProfile->account );
+
+         check(entryItr != entries.end(), "No entry found... id: " + id.to_string() + "memo: " + memo + " to: " + to.to_string());
+         check(entryItr->contestId <= 0, "Entry cannot be refunded once it has been assigned to a contest.");
+         check(entryItr->amount > 0, "Entry does not have any funds to refund.");
+
+         print(id, " ", entryItr->contestId, " ", entryItr->amount, "\n");
+
+         int64_t a = static_cast<int64_t>(entryItr->amount);
+         symbol s = symbol{"EOS", 4};
+         asset refundAmt = asset{a, s};
+
+         print("refund amt: ", refundAmt, "a: ", a, "s: ", s, "\n");
+         action{
+            permission_level{get_self(), name("active")},
+            name("eosio.token"),
+            name("transfer"),
+            std::make_tuple(get_self(), to, refundAmt, memo)
+         }.send();
+
+         // reset entry asset amount
+         entries.modify(entryItr, _self, [&](contestEntry& row) {
+            row.amount = 0;
+         });
       }
 
    private:
