@@ -1031,6 +1031,52 @@ class ContestActionsUnitTest(unittest.TestCase):
                 permission=(ALICE, Permission.ACTIVE)
             )
 
+    def test_refund_entry_payment_requires_user_auth(self):
+        videoHash360p = "150fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+        videoHash480p = "250fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+        videoHash720p = "350fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+        videoHash1080p = "450fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+        coverHash = "550fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+
+        id = "myentry13"
+        HOST.push_action(
+            "entercontest",
+            [{
+                "id":id,
+                "userId": self.userId,
+                "levelId": self.levelId,
+                "videoHash360p": videoHash360p,
+                "videoHash480p": videoHash480p,
+                "videoHash720p": videoHash720p,
+                "videoHash1080p": videoHash1080p,
+                "coverHash": coverHash,
+            }],
+            permission=(ALICE, Permission.ACTIVE)
+        )
+
+        TOKENHOST.push_action(
+            "transfer",
+            {
+                "from": ALICE,
+                "to": HOST,
+                "quantity": "1.0000 EOS",
+                "memo": id,
+            },
+            force_unique=True,
+            permission=(ALICE, Permission.ACTIVE)
+        )
+
+        with self.assertRaises(MissingRequiredAuthorityError):
+            HOST.push_action(
+                "refundentry",
+                {
+                    "id":id,
+                    "to": BOB,
+                    "memo": "test",
+                },
+                permission=(BOB, Permission.ACTIVE)
+            )
+
     @classmethod
     def tearDownClass(cls):
         stop()
