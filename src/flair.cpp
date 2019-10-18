@@ -349,6 +349,7 @@ class [[eosio::contract("flair")]] flair : public contract {
             row.createdAt = eosio::current_time_point().sec_since_epoch();
             row.contestId = 0;
             row.amount = 0;
+            row.votes = 0;
             row.open = true;
          });
       }
@@ -502,6 +503,9 @@ class [[eosio::contract("flair")]] flair : public contract {
          }
       }
 
+      /*
+         Refund Entry
+      */
       [[eosio::action]]
       void refundentry(name id, name to, std::string memo) {
          entries_index entries(_self, _self.value);
@@ -533,6 +537,58 @@ class [[eosio::contract("flair")]] flair : public contract {
          // reset entry asset amount
          entries.modify(entryItr, _self, [&](contestEntry& row) {
             row.amount = 0;
+         });
+      }
+
+      /*
+         Vote
+      */
+      [[eosio::action]]
+      void vote(name voterUserId, name entryId) {
+         profile_index profiles( _self, _self.value );
+         auto userItr = profiles.find(voterUserId.value);
+
+         check(userItr != profiles.end(), "User could not be found.");
+
+         require_auth(userItr->account);
+
+         check(userItr->active, "User must be active.");
+
+         entries_index entries(_self, _self.value);
+         auto entryItr = entries.find(entryId.value);
+
+         check(entryItr != entries.end(), "Entry could not be found.");
+
+         // ensure within voting period
+         contest_index contests(_self, _self.value);
+         auto contestItr = contests.find(entryItr->contestId);
+         uint32_t now = eosio::current_time_point().sec_since_epoch();
+
+         check(now > contestItr->createdAt + contestItr->submissionPeriod, "Voting has not begun yet.");
+         check(now <= contestItr->createdAt + contestItr->submissionPeriod + contestItr->votePeriod, "Voting has ended for this contest.");
+
+         // determine if already voted
+         vote_index votes(_self, _self.value);
+         auto votesByUserContest = votes.get_index<name("byusrcontest")>();
+         auto voteItr = votesByUserContest.find(composite_key(entryItr->contestId, voterUserId.value));
+         check(voteItr == votesByUserContest.end(), "You've already voted in this contest.");
+
+         // update entry vote count
+         entries.modify(entryItr, _self, [&](contestEntry& row) {
+            row.votes = row.votes + 1;
+         });
+
+         // add to votes table
+         uint64_t newVoteId = votes.available_primary_key();
+         if (newVoteId == 0) { newVoteId++; }
+         print("newVoteId: ", newVoteId, "\n");
+         
+         votes.emplace(_self, [&](entryvote& row) {
+            row.id = newVoteId;
+            row.contestId = entryItr->contestId;
+            row.entryId = entryId;
+            row.voterUserId = voterUserId;
+            row.createdAt = eosio::current_time_point().sec_since_epoch();
          });
       }
 
@@ -712,6 +768,7 @@ class [[eosio::contract("flair")]] flair : public contract {
          checksum256 videoHash1080p;
          checksum256 coverHash;
          uint32_t createdAt;
+         uint32_t votes;
          
          uint64_t primary_key() const { return id.value; }
          checksum256 by_userid_levelid() const {
@@ -726,7 +783,7 @@ class [[eosio::contract("flair")]] flair : public contract {
       > entries_index;
 
       /*
-         TABLE: contest
+         TABLE: contests
       */
       struct [[eosio::table]] contest {
          uint64_t id;
@@ -748,4 +805,24 @@ class [[eosio::contract("flair")]] flair : public contract {
          contest,
          indexed_by<name("bylevel"), const_mem_fun<contest, uint128_t, &contest::bylevel>>
       > contest_index;
+
+      /*
+         TABLE: votes
+      */
+      struct [[eosio::table]] entryvote {
+         uint64_t id;
+         uint64_t contestId;
+         name entryId;
+         name voterUserId;
+         uint32_t createdAt;
+
+         uint64_t primary_key() const { return id; }
+         uint128_t byusercontest() const { return composite_key(contestId, voterUserId.value); }
+      };
+
+      typedef eosio::multi_index<
+         name("votes"), 
+         entryvote,
+         indexed_by<name("byusrcontest"), const_mem_fun<entryvote, uint128_t, &entryvote::byusercontest>>
+      > vote_index;
 };

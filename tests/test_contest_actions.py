@@ -175,7 +175,7 @@ class ContestActionsUnitTest(unittest.TestCase):
                 "username":cls.userId5,
                 "imgHash":"950fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9",
                 "account": ELLIOT,
-                "active": True,
+                "active": False,
             }],
             permission=(HOST, Permission.ACTIVE)
         )
@@ -282,6 +282,7 @@ class ContestActionsUnitTest(unittest.TestCase):
             "videoHash1080p": videoHash1080p,
             "coverHash": coverHash,
             "priceUnavailable": 0,
+            "votes": 0,
             "open": 1,
         })
 
@@ -372,6 +373,7 @@ class ContestActionsUnitTest(unittest.TestCase):
             "videoHash1080p": videoHash1080p,
             "coverHash": coverHash,
             "priceUnavailable": 0,
+            "votes": 0,
             "open": 1,
         })
 
@@ -1075,6 +1077,485 @@ class ContestActionsUnitTest(unittest.TestCase):
                     "memo": "test",
                 },
                 permission=(BOB, Permission.ACTIVE)
+            )
+
+    def test_vote_saves_to_votes_table_and_updates_entry_votes_count(self):
+        videoHash360p = "150fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+        videoHash480p = "250fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+        videoHash720p = "350fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+        videoHash1080p = "450fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+        coverHash = "550fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+
+        id = "myentry15"
+        HOST.push_action(
+            "entercontest",
+            [{
+                "id":id,
+                "userId": self.userId,
+                "levelId": self.levelId,
+                "videoHash360p": videoHash360p,
+                "videoHash480p": videoHash480p,
+                "videoHash720p": videoHash720p,
+                "videoHash1080p": videoHash1080p,
+                "coverHash": coverHash,
+            }],
+            permission=(ALICE, Permission.ACTIVE)
+        )
+
+        TOKENHOST.push_action(
+            "transfer",
+            {
+                "from": ALICE,
+                "to": HOST,
+                "quantity": "2.0000 EOS",
+                "memo": id,
+            },
+            force_unique=True,
+            permission=(ALICE, Permission.ACTIVE)
+        )
+
+        id2 = "myentry15b"
+        HOST.push_action(
+            "entercontest",
+            [{
+                "id":id2,
+                "userId": self.userId2,
+                "levelId": self.levelId,
+                "videoHash360p": videoHash360p,
+                "videoHash480p": videoHash480p,
+                "videoHash720p": videoHash720p,
+                "videoHash1080p": videoHash1080p,
+                "coverHash": coverHash,
+            }],
+            permission=(BOB, Permission.ACTIVE)
+        )
+
+        TOKENHOST.push_action(
+            "transfer",
+            {
+                "from": BOB,
+                "to": HOST,
+                "quantity": "2.0000 EOS",
+                "memo": id2,
+            },
+            force_unique=True,
+            permission=(BOB, Permission.ACTIVE)
+        )
+
+        time.sleep(3) # 2 seconds is the time of the submission period
+
+        HOST.push_action(
+            "vote",
+            {
+                "entryId": id,
+                "voterUserId": self.userId3,
+            },
+            permission=(CAROL, Permission.ACTIVE)
+        )
+
+        # increments entries vote count
+        entriesRes = HOST.table("entries", HOST, lower=id, key_type="name")
+        entry = entriesRes.json["rows"][0]
+        self.assertEqual(entry["id"], id)
+        self.assertEqual(entry["votes"], 1)
+
+        # saves vote into table
+        votesRes = HOST.table("votes", HOST)
+        vote = False
+        for voteRow in votesRes.json["rows"]:
+            if (
+                voteRow["contestId"] == entry["contestId"]
+                and voteRow["entryId"] == entry["id"]
+                and voteRow["voterUserId"] == self.userId3
+            ):
+                vote = voteRow
+                break
+            
+        
+        self.assertTrue(vote != False)
+        self.assertGreater(vote["id"], 0)
+        self.assertGreaterEqual(vote["createdAt"], int(time.time()) - 1)
+
+    def test_vote_requires_user_auth(self):
+        videoHash360p = "150fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+        videoHash480p = "250fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+        videoHash720p = "350fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+        videoHash1080p = "450fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+        coverHash = "550fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+
+        id = "myentry14"
+        HOST.push_action(
+            "entercontest",
+            [{
+                "id":id,
+                "userId": self.userId,
+                "levelId": self.levelId,
+                "videoHash360p": videoHash360p,
+                "videoHash480p": videoHash480p,
+                "videoHash720p": videoHash720p,
+                "videoHash1080p": videoHash1080p,
+                "coverHash": coverHash,
+            }],
+            permission=(ALICE, Permission.ACTIVE)
+        )
+
+        TOKENHOST.push_action(
+            "transfer",
+            {
+                "from": ALICE,
+                "to": HOST,
+                "quantity": "2.0000 EOS",
+                "memo": id,
+            },
+            force_unique=True,
+            permission=(ALICE, Permission.ACTIVE)
+        )
+
+        id2 = "myentry14b"
+        HOST.push_action(
+            "entercontest",
+            [{
+                "id":id2,
+                "userId": self.userId2,
+                "levelId": self.levelId,
+                "videoHash360p": videoHash360p,
+                "videoHash480p": videoHash480p,
+                "videoHash720p": videoHash720p,
+                "videoHash1080p": videoHash1080p,
+                "coverHash": coverHash,
+            }],
+            permission=(BOB, Permission.ACTIVE)
+        )
+
+        TOKENHOST.push_action(
+            "transfer",
+            {
+                "from": BOB,
+                "to": HOST,
+                "quantity": "2.0000 EOS",
+                "memo": id2,
+            },
+            force_unique=True,
+            permission=(BOB, Permission.ACTIVE)
+        )
+
+        time.sleep(3) # 2 seconds is the time of the submission period
+
+        with self.assertRaises(MissingRequiredAuthorityError):
+            HOST.push_action(
+                "vote",
+                {
+                    "entryId": id,
+                    "voterUserId": self.userId3,
+                },
+                permission=(BOB, Permission.ACTIVE)
+            )
+
+    def test_vote_fails_when_account_is_not_active(self):
+        videoHash360p = "150fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+        videoHash480p = "250fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+        videoHash720p = "350fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+        videoHash1080p = "450fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+        coverHash = "550fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+
+        id = "myentry111"
+        HOST.push_action(
+            "entercontest",
+            [{
+                "id":id,
+                "userId": self.userId,
+                "levelId": self.levelId,
+                "videoHash360p": videoHash360p,
+                "videoHash480p": videoHash480p,
+                "videoHash720p": videoHash720p,
+                "videoHash1080p": videoHash1080p,
+                "coverHash": coverHash,
+            }],
+            permission=(ALICE, Permission.ACTIVE)
+        )
+
+        TOKENHOST.push_action(
+            "transfer",
+            {
+                "from": ALICE,
+                "to": HOST,
+                "quantity": "2.0000 EOS",
+                "memo": id,
+            },
+            force_unique=True,
+            permission=(ALICE, Permission.ACTIVE)
+        )
+
+        id2 = "myentry111b"
+        HOST.push_action(
+            "entercontest",
+            [{
+                "id":id2,
+                "userId": self.userId2,
+                "levelId": self.levelId,
+                "videoHash360p": videoHash360p,
+                "videoHash480p": videoHash480p,
+                "videoHash720p": videoHash720p,
+                "videoHash1080p": videoHash1080p,
+                "coverHash": coverHash,
+            }],
+            permission=(BOB, Permission.ACTIVE)
+        )
+
+        TOKENHOST.push_action(
+            "transfer",
+            {
+                "from": BOB,
+                "to": HOST,
+                "quantity": "2.0000 EOS",
+                "memo": id2,
+            },
+            force_unique=True,
+            permission=(BOB, Permission.ACTIVE)
+        )
+
+        time.sleep(3) # 2 seconds is the time of the submission period
+
+        with self.assertRaises(Error):
+            HOST.push_action(
+                "vote",
+                {
+                    "entryId": id,
+                    "voterUserId": self.userId5,
+                },
+                permission=(ELLIOT, Permission.ACTIVE)
+            )
+
+    def test_vote_fails_when_already_voted_in_contest(self):
+        videoHash360p = "150fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+        videoHash480p = "250fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+        videoHash720p = "350fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+        videoHash1080p = "450fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+        coverHash = "550fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+
+        id = "myentry112"
+        HOST.push_action(
+            "entercontest",
+            [{
+                "id":id,
+                "userId": self.userId,
+                "levelId": self.levelId,
+                "videoHash360p": videoHash360p,
+                "videoHash480p": videoHash480p,
+                "videoHash720p": videoHash720p,
+                "videoHash1080p": videoHash1080p,
+                "coverHash": coverHash,
+            }],
+            permission=(ALICE, Permission.ACTIVE)
+        )
+
+        TOKENHOST.push_action(
+            "transfer",
+            {
+                "from": ALICE,
+                "to": HOST,
+                "quantity": "2.0000 EOS",
+                "memo": id,
+            },
+            force_unique=True,
+            permission=(ALICE, Permission.ACTIVE)
+        )
+
+        id2 = "myentry112b"
+        HOST.push_action(
+            "entercontest",
+            [{
+                "id":id2,
+                "userId": self.userId2,
+                "levelId": self.levelId,
+                "videoHash360p": videoHash360p,
+                "videoHash480p": videoHash480p,
+                "videoHash720p": videoHash720p,
+                "videoHash1080p": videoHash1080p,
+                "coverHash": coverHash,
+            }],
+            permission=(BOB, Permission.ACTIVE)
+        )
+
+        TOKENHOST.push_action(
+            "transfer",
+            {
+                "from": BOB,
+                "to": HOST,
+                "quantity": "2.0000 EOS",
+                "memo": id2,
+            },
+            force_unique=True,
+            permission=(BOB, Permission.ACTIVE)
+        )
+
+        time.sleep(3) # 2 seconds is the time of the submission period
+
+        HOST.push_action(
+            "vote",
+            {
+                "entryId": id,
+                "voterUserId": self.userId3,
+            },
+            permission=(CAROL, Permission.ACTIVE)
+        )
+
+        with self.assertRaises(Error):
+            HOST.push_action(
+                "vote",
+                {
+                    "entryId": id2,
+                    "voterUserId": self.userId3,
+                },
+                permission=(CAROL, Permission.ACTIVE)
+            )
+
+    def test_vote_fails_when_contest_voting_period_hasnt_started(self):
+        videoHash360p = "150fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+        videoHash480p = "250fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+        videoHash720p = "350fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+        videoHash1080p = "450fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+        coverHash = "550fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+
+        id = "myentry113"
+        HOST.push_action(
+            "entercontest",
+            [{
+                "id":id,
+                "userId": self.userId,
+                "levelId": self.levelId,
+                "videoHash360p": videoHash360p,
+                "videoHash480p": videoHash480p,
+                "videoHash720p": videoHash720p,
+                "videoHash1080p": videoHash1080p,
+                "coverHash": coverHash,
+            }],
+            permission=(ALICE, Permission.ACTIVE)
+        )
+
+        TOKENHOST.push_action(
+            "transfer",
+            {
+                "from": ALICE,
+                "to": HOST,
+                "quantity": "2.0000 EOS",
+                "memo": id,
+            },
+            force_unique=True,
+            permission=(ALICE, Permission.ACTIVE)
+        )
+
+        id2 = "myentry113b"
+        HOST.push_action(
+            "entercontest",
+            [{
+                "id":id2,
+                "userId": self.userId2,
+                "levelId": self.levelId,
+                "videoHash360p": videoHash360p,
+                "videoHash480p": videoHash480p,
+                "videoHash720p": videoHash720p,
+                "videoHash1080p": videoHash1080p,
+                "coverHash": coverHash,
+            }],
+            permission=(BOB, Permission.ACTIVE)
+        )
+
+        TOKENHOST.push_action(
+            "transfer",
+            {
+                "from": BOB,
+                "to": HOST,
+                "quantity": "2.0000 EOS",
+                "memo": id2,
+            },
+            force_unique=True,
+            permission=(BOB, Permission.ACTIVE)
+        )
+
+        with self.assertRaises(Error):
+            HOST.push_action(
+                "vote",
+                {
+                    "entryId": id,
+                    "voterUserId": self.userId3,
+                },
+                permission=(CAROL, Permission.ACTIVE)
+            )
+
+    def test_vote_fails_when_contest_voting_period_has_ended(self):
+        videoHash360p = "150fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+        videoHash480p = "250fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+        videoHash720p = "350fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+        videoHash1080p = "450fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+        coverHash = "550fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+
+        id = "myentry114"
+        HOST.push_action(
+            "entercontest",
+            [{
+                "id":id,
+                "userId": self.userId,
+                "levelId": self.levelId,
+                "videoHash360p": videoHash360p,
+                "videoHash480p": videoHash480p,
+                "videoHash720p": videoHash720p,
+                "videoHash1080p": videoHash1080p,
+                "coverHash": coverHash,
+            }],
+            permission=(ALICE, Permission.ACTIVE)
+        )
+
+        TOKENHOST.push_action(
+            "transfer",
+            {
+                "from": ALICE,
+                "to": HOST,
+                "quantity": "2.0000 EOS",
+                "memo": id,
+            },
+            force_unique=True,
+            permission=(ALICE, Permission.ACTIVE)
+        )
+
+        id2 = "myentry114b"
+        HOST.push_action(
+            "entercontest",
+            [{
+                "id":id2,
+                "userId": self.userId2,
+                "levelId": self.levelId,
+                "videoHash360p": videoHash360p,
+                "videoHash480p": videoHash480p,
+                "videoHash720p": videoHash720p,
+                "videoHash1080p": videoHash1080p,
+                "coverHash": coverHash,
+            }],
+            permission=(BOB, Permission.ACTIVE)
+        )
+
+        TOKENHOST.push_action(
+            "transfer",
+            {
+                "from": BOB,
+                "to": HOST,
+                "quantity": "2.0000 EOS",
+                "memo": id2,
+            },
+            force_unique=True,
+            permission=(BOB, Permission.ACTIVE)
+        )
+
+        time.sleep(5) # 2 seconds is the time of the submission period & 2 seconds is the time of the vote period
+
+        with self.assertRaises(Error):
+            HOST.push_action(
+                "vote",
+                {
+                    "entryId": id,
+                    "voterUserId": self.userId3,
+                },
+                permission=(CAROL, Permission.ACTIVE)
             )
 
     @classmethod
