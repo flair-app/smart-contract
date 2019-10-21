@@ -50,7 +50,8 @@ class LevelActionsUnitTest(unittest.TestCase):
                 "price": 1000,
                 "participantLimit": 100,
                 "submissionPeriod": 12,
-                "votePeriod": 12
+                "votePeriod": 12,
+                "fee": 15, # = 1.5%
             }], 
             permission=(HOST, Permission.ACTIVE)
         )
@@ -66,7 +67,8 @@ class LevelActionsUnitTest(unittest.TestCase):
             "participantLimit": 100,
             "submissionPeriod": 12,
             "votePeriod": 12,
-            "archived": False
+            "archived": False,
+            "fee": 15, # = 1.5%
         }])
             
     def test_create_level_requires_auth_of_self(self):
@@ -80,7 +82,8 @@ class LevelActionsUnitTest(unittest.TestCase):
                     "price": 1000,
                     "participantLimit": 100,
                     "submissionPeriod": 12,
-                    "votePeriod": 12
+                    "votePeriod": 12,
+                    "fee": 15, # = 1.5%
                 }], 
                 permission=(ALICE, Permission.ACTIVE)
             )
@@ -96,7 +99,8 @@ class LevelActionsUnitTest(unittest.TestCase):
                     "price": 1000,
                     "participantLimit": 100,
                     "submissionPeriod": 12,
-                    "votePeriod": 12
+                    "votePeriod": 12,
+                    "fee": 15, # = 1.5%
                 }], 
                 permission=(HOST, Permission.ACTIVE)
             )
@@ -111,7 +115,8 @@ class LevelActionsUnitTest(unittest.TestCase):
                 "price": 1000,
                 "participantLimit": 100,
                 "submissionPeriod": 12,
-                "votePeriod": 12
+                "votePeriod": 12,
+                "fee": 15, # = 1.5%
             }], 
             permission=(HOST, Permission.ACTIVE),
             force_unique=1
@@ -127,7 +132,8 @@ class LevelActionsUnitTest(unittest.TestCase):
                     "price": 1000,
                     "participantLimit": 100,
                     "submissionPeriod": 12,
-                    "votePeriod": 12
+                    "votePeriod": 12,
+                    "fee": 15, # = 1.5%
                 }, 
                 permission=(HOST, Permission.ACTIVE),
                 force_unique=1
@@ -143,7 +149,8 @@ class LevelActionsUnitTest(unittest.TestCase):
                 "price": 1000,
                 "participantLimit": 100,
                 "submissionPeriod": 12,
-                "votePeriod": 12
+                "votePeriod": 12,
+                "fee": 15, # = 1.5%
             }],
             permission=(HOST, Permission.ACTIVE),
             force_unique=1
@@ -159,7 +166,8 @@ class LevelActionsUnitTest(unittest.TestCase):
                     "price": 1001,
                     "participantLimit": 101,
                     "submissionPeriod": 13,
-                    "votePeriod": 13
+                    "votePeriod": 13,
+                    "fee": 15, # = 1.5%
                 },
             },
             permission=(HOST, Permission.ACTIVE),
@@ -177,7 +185,8 @@ class LevelActionsUnitTest(unittest.TestCase):
             "price": 1001,
             "participantLimit": 101,
             "submissionPeriod": 13,
-            "votePeriod": 13
+            "votePeriod": 13,
+            "fee": 15, # = 1.5%
         }])
 
     def test_edit_level_requires_auth_self(self):
@@ -192,7 +201,8 @@ class LevelActionsUnitTest(unittest.TestCase):
                         "price": 1001,
                         "participantLimit": 101,
                         "submissionPeriod": 13,
-                        "votePeriod": 13
+                        "votePeriod": 13,
+                        "fee": 15, # = 1.5%
                     },
                 },
                 permission=(ALICE, Permission.ACTIVE),

@@ -190,9 +190,7 @@ class ContestActionsUnitTest(unittest.TestCase):
             permission=(HOST, Permission.ACTIVE)
         )
 
-    def setUp(self):
-        time.sleep(1)
-
+    def randomEOSIOId(self):
         allowChar = "abcdefghijklmnopqrstuvwxyz12345."
         
         randomId = ""
@@ -200,7 +198,12 @@ class ContestActionsUnitTest(unittest.TestCase):
             randomCharIndex = random.randrange(0,31,1)
             randomId += allowChar[randomCharIndex]
         
-        self.levelId = randomId
+        return randomId
+
+    def setUp(self):
+        time.sleep(1) # prevent non unique error for timestamps in eos prices
+        
+        self.levelId = self.randomEOSIOId()
         
         HOST.push_action(
             "createlevel", 
@@ -211,7 +214,8 @@ class ContestActionsUnitTest(unittest.TestCase):
                 "price": 1000,
                 "participantLimit": 2,
                 "submissionPeriod": 2,
-                "votePeriod": 2
+                "votePeriod": 2,
+                "fee": 100,
             }], 
             permission=(HOST, Permission.ACTIVE)
         )

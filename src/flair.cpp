@@ -65,6 +65,7 @@ class [[eosio::contract("flair")]] flair : public contract {
          uint32_t participantLimit;
          uint32_t submissionPeriod;
          uint32_t votePeriod;
+         uint32_t fee;
       };
 
       [[eosio::action]]
@@ -82,6 +83,7 @@ class [[eosio::contract("flair")]] flair : public contract {
             row.submissionPeriod = params.submissionPeriod;
             row.votePeriod = params.votePeriod;
             row.archived = false;
+            row.fee = params.fee;
          });
       }
 
@@ -95,6 +97,7 @@ class [[eosio::contract("flair")]] flair : public contract {
          uint32_t participantLimit;
          uint32_t submissionPeriod;
          uint32_t votePeriod;
+         uint32_t fee;
       };
 
       [[eosio::action]]
@@ -112,6 +115,7 @@ class [[eosio::contract("flair")]] flair : public contract {
             row.participantLimit = data.participantLimit;
             row.submissionPeriod = data.submissionPeriod;
             row.votePeriod = data.votePeriod;
+            row.fee = data.fee;
          });
       }
 
@@ -261,16 +265,7 @@ class [[eosio::contract("flair")]] flair : public contract {
       [[eosio::action]]
       void setentryexp(uint64_t exp) {
          require_auth( _self );
-
-         entry_exp_index entry_exp_table( _self, _self.value );
-
-         if (entry_exp_table.begin() != entry_exp_table.end()) {
-            entry_exp_table.erase(entry_exp_table.begin());
-         }
-
-         entry_exp_table.emplace(_self, [&](entryexp& row) {
-            row.exp = exp;
-         });
+         set_option(name{"entryexp"}, exp);
       }
 
       /*
@@ -279,16 +274,7 @@ class [[eosio::contract("flair")]] flair : public contract {
       [[eosio::action]]
       void setpricefrsh(uint64_t freshness) {
          require_auth( _self );
-
-         price_fresh_index price_fresh_table( _self, _self.value );
-
-         if (price_fresh_table.begin() != price_fresh_table.end()) {
-            price_fresh_table.erase(price_fresh_table.begin());
-         }
-
-         price_fresh_table.emplace(_self, [&](pricefresh& row) {
-            row.freshness = freshness;
-         });
+         set_option(name{"pricefresh"}, freshness);
       }
 
       /*
@@ -387,8 +373,7 @@ class [[eosio::contract("flair")]] flair : public contract {
          uint32_t now = eosio::current_time_point().sec_since_epoch();
 
          // ensure entry is not expired
-         entry_exp_index entry_exp_table( _self, _self.value );
-         uint64_t entryexpTime = entry_exp_table.begin()->exp;
+         uint64_t entryexpTime = get_option_int(name{"entryexp"});
 
          if (now > entryItr->createdAt + entryexpTime) {
             print("Entry is expired, please initiate refund to recieve money back.\n");
@@ -444,8 +429,7 @@ class [[eosio::contract("flair")]] flair : public contract {
          }
 
          // mark entry as priceUnavailable if lastest EOS price openTime + intervalSec is older than the set required price freshness
-         price_fresh_index price_fresh_table( _self, _self.value );
-         uint64_t freshTime = price_fresh_table.begin()->freshness;
+         uint64_t freshTime = get_option_int(name{"pricefresh"});
          auto lastPrice = --pricesByEndTime.end();
          bool freshPrice = (lastPrice->openTime + lastPrice->intervalSec) + freshTime > now;
          print("price fresh debug: freshPrice=", freshPrice," lastEndTime=", lastPrice->openTime + lastPrice->intervalSec, ", freshTime=", freshTime, " | ", lastPrice->openTime + lastPrice->intervalSec + freshTime, " > ", now, "\n");
@@ -487,6 +471,7 @@ class [[eosio::contract("flair")]] flair : public contract {
                row.submissionsClosed = false;
                row.votePeriod = levelItr->votePeriod;
                row.createdAt = eosio::current_time_point().sec_since_epoch();
+               row.paid = false;
             });
 
             if(curContestItr != byLevelIdx.end()) {
@@ -592,7 +577,126 @@ class [[eosio::contract("flair")]] flair : public contract {
          });
       }
 
+      /*
+         Set Fee Account
+      */
+      [[eosio::action]]
+      void setfeeacct(name account, std::string memo) {
+         require_auth( _self );
+         set_option(name{"feeacct"}, account.to_string());
+         set_option(name{"feeacctmemo"}, memo);
+      }
+
+      /*
+         Update
+      */
+      [[eosio::action]]
+      void update() {
+         require_auth( _self );
+         print("hello from update \n");
+         distributeContestWinnings();
+         refundOneEntryContests();
+         checkUnavailablePriceEntries();
+      }
+
    private:
+      void distributeContestWinnings() {
+         print("distributeContestWinnings \n");
+         contest_index contests( _self, _self.value );
+         auto contestsByEndtime = contests.get_index<name("byendtime")>();
+         uint64_t now = eosio::current_time_point().sec_since_epoch();
+         auto contestItrEndTime = contestsByEndtime.upper_bound(now - 1);
+
+         if (contestItrEndTime == contestsByEndtime.begin()) {
+            print("no unpaid contests ending at or before ", now - 1, "\n");
+            return;
+         } else {
+            contestItrEndTime--;
+         }
+         
+         auto contestItr = contestItrEndTime;
+         bool hitBeginning = false;
+         while(!hitBeginning && contestItr->paid == false) {
+            print("contest id: ", contestItr->id, "\n");
+            entries_index entries(_self, _self.value);
+            auto entriesByContest = entries.get_index<name("bycontest")>();
+            auto contestEntriesItr = entriesByContest.lower_bound(contestItr->id);
+
+            uint64_t contestPrize = 0;
+            std::list<uint64_t> winners;
+            uint64_t votes;
+
+            // sum amount of all entry within contest & find winner(s)
+            for (auto entryItr = contestEntriesItr; entryItr->contestId == contestItr->id && entryItr != entriesByContest.end(); entryItr++) {
+               contestPrize += entryItr->amount;
+               if (entryItr->votes > votes) {
+                  votes = entryItr->votes;
+                  winners.clear();
+                  winners.push_back(entryItr->userId.value);
+               } else if(entryItr->votes == votes) {
+                  winners.push_back(entryItr->userId.value);
+               }
+            }
+            
+            level_index levels(_self, _self.value);
+            auto levelItr = levels.find(contestItr->levelId.value);
+            uint64_t feeAmount = (contestPrize * 10) / levelItr->fee;
+            uint64_t prizeRemainder = contestPrize;
+            uint64_t winnerPrice = (contestPrize - feeAmount) / winners.size();
+
+            for (auto winner = winners.begin(); winner != winners.end(); ++winner){
+               prizeRemainder -= winnerPrice;
+
+               profile_index profiles(_self, _self.value);
+               auto profileItr = profiles.find(*winner);
+               if (profileItr == profiles.end()) {
+                  continue;
+               }
+
+               int64_t a = static_cast<int64_t>(winnerPrice);
+               symbol s = symbol{"EOS", 4};
+               asset amt = asset{a, s};
+
+               action{
+                  permission_level{get_self(), name("active")},
+                  name("eosio.token"),
+                  name("transfer"),
+                  std::make_tuple(get_self(), profileItr->account, amt, contestItr->id)
+               }.send();
+            }
+
+            int64_t a = static_cast<int64_t>(prizeRemainder);
+            symbol s = symbol{"EOS", 4};
+            asset amt = asset{a, s};
+            name feeacct(get_option(name{"feeacct"}));
+            std::string feeacctmemo = get_option(name{"feeacctmemo"});
+            print("feeacct: ", feeacct, ", memo: ", feeacctmemo, ", amount: ", amt, "\n");
+            action{
+               permission_level{get_self(), name("active")},
+               name("eosio.token"),
+               name("transfer"),
+               std::make_tuple(get_self(), feeacct, amt, feeacctmemo)
+            }.send();
+
+            contestsByEndtime.modify(contestItr, _self, [&](contest& row) {
+               row.paid = true;
+            });
+
+            hitBeginning = contestItr == contestsByEndtime.begin();
+            if (!hitBeginning) {
+               contestItr--;
+            }
+         }              
+      }
+
+      void refundOneEntryContests() {
+         
+      }
+
+      void checkUnavailablePriceEntries() {
+         
+      }
+
       bool checkusername(std::string username) {
          print("checkusername ", username, "\n");
 
@@ -686,6 +790,7 @@ class [[eosio::contract("flair")]] flair : public contract {
          uint32_t participantLimit;
          uint32_t submissionPeriod;
          uint32_t votePeriod;
+         uint32_t fee;
 
          uint64_t primary_key() const { return id.value; }
       };
@@ -714,24 +819,49 @@ class [[eosio::contract("flair")]] flair : public contract {
       > profile_index;
 
       /*
-         TABLE: entryexp
+         TABLE: options
       */
-      struct [[eosio::table]] entryexp {
-         uint64_t exp;
-         uint64_t primary_key() const { return exp; }
+      struct [[eosio::table]] option {
+         name id;
+         std::string value;
+         uint64_t primary_key() const { return id.value; }
       };
 
-      typedef eosio::multi_index<name("entryexp"), entryexp> entry_exp_index;
+      typedef eosio::multi_index<name("options"), option> option_index;
 
-      /*
-         TABLE: pricefresh
-      */
-      struct [[eosio::table]] pricefresh {
-         uint64_t freshness;
-         uint64_t primary_key() const { return freshness; }
-      };
+      void set_option(name id, std::string value) {
+         option_index options(_self, _self.value);
+         auto optionItr = options.find(id.value);
+         if (optionItr == options.end()) {
+            options.emplace(_self, [&](option& row) {
+               row.id = id;
+               row.value = value;
+            });
+         } else {
+            options.modify(optionItr, _self, [&](option& row) {
+               row.value = value;
+            });
+         }
+      }
 
-      typedef eosio::multi_index<name("pricefresh"), pricefresh> price_fresh_index;
+      void set_option(name id, uint64_t value) {
+         set_option(id, std::to_string(value));
+      }
+
+      std::string get_option(name id) {
+         option_index options(_self, _self.value);
+         auto optionItr = options.find(id.value);
+         if (optionItr == options.end()) {
+            return "";
+         } else {
+            return optionItr->value;
+         }
+      }
+
+      uint64_t get_option_int(name id) {
+         std::string str = get_option(id);
+         return std::stoi(str);
+      }
 
       /*
          TABLE: eosprices
@@ -774,12 +904,16 @@ class [[eosio::contract("flair")]] flair : public contract {
          checksum256 by_userid_levelid() const {
             return composite_key(userId.value, levelId.value, open);
          }
+         uint64_t bycontest() const {
+            return contestId;
+         }
       };
       
       typedef eosio::multi_index<
          name("entries"), 
          contestEntry,
-         indexed_by<name("byuserandlvl"), const_mem_fun<contestEntry, checksum256, &contestEntry::by_userid_levelid>>
+         indexed_by<name("byuserandlvl"), const_mem_fun<contestEntry, checksum256, &contestEntry::by_userid_levelid>>,
+         indexed_by<name("bycontest"), const_mem_fun<contestEntry, uint64_t, &contestEntry::bycontest>>
       > entries_index;
 
       /*
@@ -795,15 +929,18 @@ class [[eosio::contract("flair")]] flair : public contract {
          uint32_t submissionPeriod;
          uint32_t votePeriod;
          uint32_t createdAt;
+         bool paid;
 
          uint64_t primary_key() const { return id; }
          uint128_t bylevel() const { return composite_key(levelId.value, submissionsClosed); }
+         uint64_t byendtime() const { return createdAt + submissionPeriod + votePeriod; }
       };
 
       typedef eosio::multi_index<
-         name("contests"), 
+         name("contests"),
          contest,
-         indexed_by<name("bylevel"), const_mem_fun<contest, uint128_t, &contest::bylevel>>
+         indexed_by<name("bylevel"), const_mem_fun<contest, uint128_t, &contest::bylevel>>,
+         indexed_by<name("byendtime"), const_mem_fun<contest, uint64_t, &contest::byendtime>>
       > contest_index;
 
       /*
