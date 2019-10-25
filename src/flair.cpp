@@ -595,7 +595,6 @@ class [[eosio::contract("flair")]] flair : public contract {
          require_auth( _self );
          print("hello from update \n");
          distributeContestWinnings();
-         refundOneEntryContests();
          checkUnavailablePriceEntries();
       }
 
@@ -689,12 +688,8 @@ class [[eosio::contract("flair")]] flair : public contract {
          }              
       }
 
-      void refundOneEntryContests() {
-         
-      }
-
       void checkUnavailablePriceEntries() {
-         
+
       }
 
       bool checkusername(std::string username) {
