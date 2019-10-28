@@ -30,6 +30,13 @@ class addeoshighUnitTest(unittest.TestCase):
         create_account("ALICE", MASTER)
         create_account("BOB", MASTER)
 
+        HOST.push_action(
+            "setentryexp",
+            [12 * 3600],
+            permission=(HOST, Permission.ACTIVE),
+            force_unique=1
+        )
+
     def setUp(self):
         pass
 

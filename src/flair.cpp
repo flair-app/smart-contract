@@ -224,7 +224,7 @@ class [[eosio::contract("flair")]] flair : public contract {
          require_auth(_self);
 
          uint32_t curEpoch = eosio::current_time_point().sec_since_epoch();
-         uint32_t EOSPriceStoreLifeSec = 12 * 3600;
+         uint32_t EOSPriceStoreLifeSec = get_option_int(name{"entryexp"});
          uint32_t EOSPriceExpTime = curEpoch - EOSPriceStoreLifeSec;
 
          check(openTime > EOSPriceExpTime, "Open time must be within last 12 hours");
@@ -364,128 +364,7 @@ class [[eosio::contract("flair")]] flair : public contract {
             row.amount = row.amount + quantity.amount;
          });
          
-         // ensure entry is already assigned to contest
-         if(entryItr->contestId != 0) {
-            print("Entry already paid & assigned to contest.\n");
-            return;
-         }
-
-         uint32_t now = eosio::current_time_point().sec_since_epoch();
-
-         // ensure entry is not expired
-         uint64_t entryexpTime = get_option_int(name{"entryexp"});
-
-         if (now > entryItr->createdAt + entryexpTime) {
-            print("Entry is expired, please initiate refund to recieve money back.\n");
-            return;
-         }
-
-         // get level interator
-         level_index levels(_self, _self.value);
-         auto levelItr = levels.find(entryItr->levelId.value);
-
-         if (levelItr == levels.end()) {
-            print("Error Creating Contest: could not find level with that id.", "\n");
-            return;
-         }
-
-         // get contest interator
-         contest_index contests(_self, _self.value);
-         auto byLevelIdx = contests.get_index<name("bylevel")>();
-         uint64_t submissionsClosed = false;
-         auto curContestItr = byLevelIdx.lower_bound(composite_key(entryItr->levelId.value, submissionsClosed));
-
-         uint64_t contestPrice = 0;
-         
-         // print("curContest: ", curContestItr->id, " ", curContestItr->levelId, " ", curContestItr->participantCount, "\n");
-         // print("curContest Not End: ", curContestItr != byLevelIdx.end(), "\n");
-         // print("levelId Matches: ", curContestItr->levelId == entryItr->levelId, "\n");
-         // print("contest not full: ", curContestItr->participantCount < curContestItr->participantLimit, "\n");
-         bool curContestValid = (
-            curContestItr != byLevelIdx.end()
-            && curContestItr->levelId == entryItr->levelId
-            && curContestItr->participantCount < curContestItr->participantLimit
-            && now <= curContestItr->createdAt + curContestItr->submissionPeriod
-         );
-
-         if (curContestValid) {
-            contestPrice = curContestItr->price;
-         } else {
-            contestPrice = levelItr->price;
-         }
-
-         // determine eos price high since entry created
-         eosprice_index eosprices(_self, _self.value);
-         auto pricesByEndTime = eosprices.get_index<name("byendtime")>();
-         auto priceItr = pricesByEndTime.lower_bound(entryItr->createdAt);
-
-         uint64_t priceHigh = 0;
-
-         for (auto itr = priceItr; itr != pricesByEndTime.end(); itr++) {
-            print("debug price high: ", itr->usdHigh, "\n");
-            if(itr->usdHigh > priceHigh) {
-               priceHigh = itr->usdHigh;
-            }
-         }
-
-         // mark entry as priceUnavailable if lastest EOS price openTime + intervalSec is older than the set required price freshness
-         uint64_t freshTime = get_option_int(name{"pricefresh"});
-         auto lastPrice = --pricesByEndTime.end();
-         bool freshPrice = (lastPrice->openTime + lastPrice->intervalSec) + freshTime > now;
-         print("price fresh debug: freshPrice=", freshPrice," lastEndTime=", lastPrice->openTime + lastPrice->intervalSec, ", freshTime=", freshTime, " | ", lastPrice->openTime + lastPrice->intervalSec + freshTime, " > ", now, "\n");
-         if(priceHigh <= 0 || !freshPrice) {
-            entries.modify(entryItr, _self, [&](contestEntry& row) {
-               row.priceUnavailable = true;
-            });
-
-            print("EOS Price Unavailable: run update action to recheck once price has been updated.\n");
-            return;
-         }
-
-         // fail if quantity is not enough.
-         print("debug price: ", priceHigh, " ", quantity.amount, " ", contestPrice, "\n");
-         if (priceHigh * quantity.amount < contestPrice * 1000000) {
-            print("Payment not enough only $", (float)(priceHigh * quantity.amount) / 100000000.0,".\n");
-            return;
-         }
-
-         if (curContestValid) {
-            entries.modify(entryItr, _self, [&](contestEntry& row) {
-               row.contestId = curContestItr->id;
-            });
-            byLevelIdx.modify(curContestItr, _self, [&](contest& row) {
-               row.participantCount++;
-            });
-         } else {
-            uint64_t newContestId = contests.available_primary_key();
-            if (newContestId == 0) { newContestId++; }
-            print("newContestId: ", newContestId, "\n");
-            
-            contests.emplace(_self, [&](contest& row) {
-               row.id = newContestId;
-               row.levelId = entryItr->levelId;
-               row.participantLimit = levelItr->participantLimit;
-               row.participantCount = 1;
-               row.price = levelItr->price;
-               row.submissionPeriod = levelItr->submissionPeriod;
-               row.submissionsClosed = false;
-               row.votePeriod = levelItr->votePeriod;
-               row.createdAt = eosio::current_time_point().sec_since_epoch();
-               row.paid = false;
-            });
-
-            if(curContestItr != byLevelIdx.end()) {
-               byLevelIdx.modify(curContestItr, _self, [&](contest& row) {
-                  row.submissionsClosed = 1;
-               });
-            }
-
-            entries.modify(entryItr, _self, [&](contestEntry& row) {
-               row.contestId = newContestId;
-            });
-
-            print(entryId, " activated with contest id of ", newContestId, "\n");
-         }
+         activateEntry<decltype(entries), decltype(entryItr)>(entries, entryItr);
       }
 
       /*
@@ -599,6 +478,178 @@ class [[eosio::contract("flair")]] flair : public contract {
       }
 
    private:
+      /*
+         TABLE: categories
+      */
+      struct [[eosio::table]] category {
+         name id;
+         std::string name;
+         uint32_t maxVideoLength;
+         bool archived;
+
+         uint64_t primary_key() const { return id.value; }
+      };
+
+      typedef eosio::multi_index<name("categories"), category> category_index;
+
+      /*
+         TABLE: levels
+      */
+      struct [[eosio::table]] level {
+         name id;
+         name categoryId;
+         std::string name;
+         bool archived;
+         uint32_t price;
+         uint32_t participantLimit;
+         uint32_t submissionPeriod;
+         uint32_t votePeriod;
+         uint32_t fee;
+
+         uint64_t primary_key() const { return id.value; }
+      };
+
+      typedef eosio::multi_index<name("levels"), level> level_index;
+
+      /*
+         TABLE: profiles
+      */
+      struct [[eosio::table]] profile {
+         name id;
+         std::string username;
+         checksum256 usernameHash;
+         checksum256 imgHash;
+         name account;
+         bool active;
+
+         uint64_t primary_key() const { return id.value; }
+         checksum256 by_username_hash() const { return usernameHash; }
+      };
+
+      typedef eosio::multi_index<
+         name("profiles"), 
+         profile,
+         indexed_by<name("byusername"), const_mem_fun<profile, checksum256, &profile::by_username_hash>>
+      > profile_index;
+
+      /*
+         TABLE: options
+      */
+      struct [[eosio::table]] option {
+         name id;
+         std::string value;
+         uint64_t primary_key() const { return id.value; }
+      };
+
+      typedef eosio::multi_index<name("options"), option> option_index;
+
+      /*
+         TABLE: eosprices
+      */
+      struct [[eosio::table]] eosprice {
+         uint64_t openTime;
+         uint32_t usdHigh; // represented as one hundredth of a cent ($1.00 * 1000)
+         uint32_t intervalSec;
+
+         uint64_t primary_key() const { return openTime; }
+         uint64_t endtime_key() const { return openTime + intervalSec; }
+      };
+
+      typedef eosio::multi_index<
+         name("eosprices"),
+         eosprice,
+         indexed_by<name("byendtime"), const_mem_fun<eosprice, uint64_t, &eosprice::endtime_key>>
+      > eosprice_index;
+
+      /*
+         TABLE: entries
+      */
+      struct [[eosio::table]] contestEntry {
+         name id;
+         name userId;
+         name levelId;
+         uint64_t contestId;
+         uint64_t amount;
+         bool priceUnavailable;
+         bool open;
+         checksum256 videoHash360p;
+         checksum256 videoHash480p;
+         checksum256 videoHash720p;
+         checksum256 videoHash1080p;
+         checksum256 coverHash;
+         uint32_t createdAt;
+         uint32_t votes;
+         
+         uint64_t primary_key() const { return id.value; }
+         checksum256 by_userid_levelid() const {
+            return composite_key(userId.value, levelId.value, open);
+         }
+         uint64_t bycontest() const {
+            return contestId;
+         }
+         uint64_t bypriceunavail() const {
+            return priceUnavailable;
+         }
+      };
+      
+      typedef eosio::multi_index<
+         name("entries"), 
+         contestEntry,
+         indexed_by<name("byuserandlvl"), const_mem_fun<contestEntry, checksum256, &contestEntry::by_userid_levelid>>,
+         indexed_by<name("bycontest"), const_mem_fun<contestEntry, uint64_t, &contestEntry::bycontest>>,
+         indexed_by<name("bynoprice"), const_mem_fun<contestEntry, uint64_t, &contestEntry::bypriceunavail>>
+      > entries_index;
+
+      /*
+         TABLE: contests
+      */
+      struct [[eosio::table]] contest {
+         uint64_t id;
+         name levelId;
+         uint64_t price;
+         uint32_t participantLimit;
+         uint32_t participantCount;
+         bool submissionsClosed;
+         uint32_t submissionPeriod;
+         uint32_t votePeriod;
+         uint32_t createdAt;
+         bool paid;
+
+         uint64_t primary_key() const { return id; }
+         uint128_t bylevel() const { return composite_key(levelId.value, submissionsClosed); }
+         uint64_t byendtime() const { return createdAt + submissionPeriod + votePeriod; }
+      };
+
+      typedef eosio::multi_index<
+         name("contests"),
+         contest,
+         indexed_by<name("bylevel"), const_mem_fun<contest, uint128_t, &contest::bylevel>>,
+         indexed_by<name("byendtime"), const_mem_fun<contest, uint64_t, &contest::byendtime>>
+      > contest_index;
+
+      /*
+         TABLE: votes
+      */
+      struct [[eosio::table]] entryvote {
+         uint64_t id;
+         uint64_t contestId;
+         name entryId;
+         name voterUserId;
+         uint32_t createdAt;
+
+         uint64_t primary_key() const { return id; }
+         uint128_t byusercontest() const { return composite_key(contestId, voterUserId.value); }
+      };
+
+      typedef eosio::multi_index<
+         name("votes"), 
+         entryvote,
+         indexed_by<name("byusrcontest"), const_mem_fun<entryvote, uint128_t, &entryvote::byusercontest>>
+      > vote_index;
+
+      /*
+         Distribute Contest Winnings - used within update
+      */
       void distributeContestWinnings() {
          print("distributeContestWinnings \n");
          contest_index contests( _self, _self.value );
@@ -688,8 +739,17 @@ class [[eosio::contract("flair")]] flair : public contract {
          }              
       }
 
+      /*
+         Re-check Entries marked as UnavailablePrice  - used within update
+      */
       void checkUnavailablePriceEntries() {
+         entries_index entries(_self, _self.value);
+         auto entriesByNoPrice = entries.get_index<name("bynoprice")>();
+         auto noPriceEntriesItr = entriesByNoPrice.lower_bound(1);
 
+         for (auto entryItr = noPriceEntriesItr; entryItr != entriesByNoPrice.end(); ++entryItr){
+            activateEntry<decltype(entriesByNoPrice), decltype(entryItr)>(entriesByNoPrice, entryItr);
+         }
       }
 
       bool checkusername(std::string username) {
@@ -759,70 +819,142 @@ class [[eosio::contract("flair")]] flair : public contract {
          );
       }
 
-      /*
-         TABLE: categories
-      */
-      struct [[eosio::table]] category {
-         name id;
-         std::string name;
-         uint32_t maxVideoLength;
-         bool archived;
+      template <typename entriesT, typename entryItrT>
+      bool activateEntry(entriesT& entries, entryItrT& entryItr) {
+         if(entryItr == entries.end()) {
+            print("Cannot activate entry: invalid entry");
+            return false;
+         }
 
-         uint64_t primary_key() const { return id.value; }
-      };
+         // ensure entry is already assigned to contest
+         if(entryItr->contestId != 0) {
+            print("Entry already paid & assigned to contest.\n");
+            return false;
+         }
 
-      typedef eosio::multi_index<name("categories"), category> category_index;
+         uint32_t now = eosio::current_time_point().sec_since_epoch();
 
-      /*
-         TABLE: levels
-      */
-      struct [[eosio::table]] level {
-         name id;
-         name categoryId;
-         std::string name;
-         bool archived;
-         uint32_t price;
-         uint32_t participantLimit;
-         uint32_t submissionPeriod;
-         uint32_t votePeriod;
-         uint32_t fee;
+         // ensure entry is not expired
+         uint64_t entryexpTime = get_option_int(name{"entryexp"});
 
-         uint64_t primary_key() const { return id.value; }
-      };
+         if (now > entryItr->createdAt + entryexpTime) {
+            print("Entry is expired, please initiate refund to recieve money back.\n");
+            return false;
+         }
 
-      typedef eosio::multi_index<name("levels"), level> level_index;
+         // get level interator
+         level_index levels(_self, _self.value);
+         auto levelItr = levels.find(entryItr->levelId.value);
 
-      /*
-         TABLE: profiles
-      */
-      struct [[eosio::table]] profile {
-         name id;
-         std::string username;
-         checksum256 usernameHash;
-         checksum256 imgHash;
-         name account;
-         bool active;
+         if (levelItr == levels.end()) {
+            print("Error Creating Contest: could not find level with that id.", "\n");
+            return false;
+         }
 
-         uint64_t primary_key() const { return id.value; }
-         checksum256 by_username_hash() const { return usernameHash; }
-      };
+         // get contest interator
+         contest_index contests(_self, _self.value);
+         auto byLevelIdx = contests.get_index<name("bylevel")>();
+         uint64_t submissionsClosed = false;
+         auto curContestItr = byLevelIdx.lower_bound(composite_key(entryItr->levelId.value, submissionsClosed));
 
-      typedef eosio::multi_index<
-         name("profiles"), 
-         profile,
-         indexed_by<name("byusername"), const_mem_fun<profile, checksum256, &profile::by_username_hash>>
-      > profile_index;
+         uint64_t contestPrice = 0;
+         
+         // print("curContest: ", curContestItr->id, " ", curContestItr->levelId, " ", curContestItr->participantCount, "\n");
+         // print("curContest Not End: ", curContestItr != byLevelIdx.end(), "\n");
+         // print("levelId Matches: ", curContestItr->levelId == entryItr->levelId, "\n");
+         // print("contest not full: ", curContestItr->participantCount < curContestItr->participantLimit, "\n");
+         bool curContestValid = (
+            curContestItr != byLevelIdx.end()
+            && curContestItr->levelId == entryItr->levelId
+            && curContestItr->participantCount < curContestItr->participantLimit
+            && now <= curContestItr->createdAt + curContestItr->submissionPeriod
+         );
 
-      /*
-         TABLE: options
-      */
-      struct [[eosio::table]] option {
-         name id;
-         std::string value;
-         uint64_t primary_key() const { return id.value; }
-      };
+         if (curContestValid) {
+            contestPrice = curContestItr->price;
+         } else {
+            contestPrice = levelItr->price;
+         }
 
-      typedef eosio::multi_index<name("options"), option> option_index;
+         // determine eos price high since entry created
+         eosprice_index eosprices(_self, _self.value);
+         auto pricesByEndTime = eosprices.get_index<name("byendtime")>();
+         auto priceItr = pricesByEndTime.lower_bound(entryItr->createdAt);
+
+         uint64_t priceHigh = 0;
+
+         for (auto itr = priceItr; itr != pricesByEndTime.end(); itr++) {
+            print("debug price high: ", itr->usdHigh, "\n");
+            if(itr->usdHigh > priceHigh) {
+               priceHigh = itr->usdHigh;
+            }
+         }
+
+         // mark entry as priceUnavailable if lastest EOS price openTime + intervalSec is older than the set required price freshness
+         uint64_t freshTime = get_option_int(name{"pricefresh"});
+         auto lastPrice = --pricesByEndTime.end();
+         bool freshPrice = (lastPrice->openTime + lastPrice->intervalSec) + freshTime > now;
+         print("price fresh debug: freshPrice=", freshPrice," lastEndTime=", lastPrice->openTime + lastPrice->intervalSec, ", freshTime=", freshTime, " | ", lastPrice->openTime + lastPrice->intervalSec + freshTime, " > ", now, "\n");
+         if(priceHigh <= 0 || !freshPrice) {
+            entries.modify(entryItr, _self, [&](contestEntry& row) {
+               row.priceUnavailable = true;
+            });
+
+            print("EOS Price Unavailable: run update action to recheck once price has been updated.\n");
+            return false;
+         }
+
+         // fail if quantity is not enough.
+         print("debug price: ", priceHigh, " ", entryItr->amount, " ", contestPrice, "\n");
+         if (priceHigh * entryItr->amount < contestPrice * 1000000) {
+            print("Payment not enough only $", (float)(priceHigh * entryItr->amount) / 100000000.0,".\n");
+            return false;
+         }
+
+         if (curContestValid) {
+            entries.modify(entryItr, _self, [&](contestEntry& row) {
+               row.contestId = curContestItr->id;
+               row.priceUnavailable = 0;
+            });
+            byLevelIdx.modify(curContestItr, _self, [&](contest& row) {
+               row.participantCount++;
+            });
+            return true;
+         } else {
+            uint64_t newContestId = contests.available_primary_key();
+            if (newContestId == 0) { newContestId++; }
+            print("newContestId: ", newContestId, "\n");
+            
+            contests.emplace(_self, [&](contest& row) {
+               row.id = newContestId;
+               row.levelId = entryItr->levelId;
+               row.participantLimit = levelItr->participantLimit;
+               row.participantCount = 1;
+               row.price = levelItr->price;
+               row.submissionPeriod = levelItr->submissionPeriod;
+               row.submissionsClosed = false;
+               row.votePeriod = levelItr->votePeriod;
+               row.createdAt = eosio::current_time_point().sec_since_epoch();
+               row.paid = false;
+            });
+
+            if(curContestItr != byLevelIdx.end()) {
+               byLevelIdx.modify(curContestItr, _self, [&](contest& row) {
+                  row.submissionsClosed = 1;
+               });
+            }
+
+            entries.modify(entryItr, _self, [&](contestEntry& row) {
+               row.contestId = newContestId;
+               row.priceUnavailable = 0;
+            });
+
+            print(entryItr->id, " activated with contest id of ", newContestId, "\n");
+            return true;
+         }
+
+         return false;
+      }
 
       void set_option(name id, std::string value) {
          option_index options(_self, _self.value);
@@ -857,104 +989,4 @@ class [[eosio::contract("flair")]] flair : public contract {
          std::string str = get_option(id);
          return std::stoi(str);
       }
-
-      /*
-         TABLE: eosprices
-      */
-      struct [[eosio::table]] eosprice {
-         uint64_t openTime;
-         uint32_t usdHigh; // represented as one hundredth of a cent ($1.00 * 1000)
-         uint32_t intervalSec;
-
-         uint64_t primary_key() const { return openTime; }
-         uint64_t endtime_key() const { return openTime + intervalSec; }
-      };
-
-      typedef eosio::multi_index<
-         name("eosprices"), 
-         eosprice,
-         indexed_by<name("byendtime"), const_mem_fun<eosprice, uint64_t, &eosprice::endtime_key>>
-      > eosprice_index;
-
-      /*
-         TABLE: entries
-      */
-      struct [[eosio::table]] contestEntry {
-         name id;
-         name userId;
-         name levelId;
-         uint64_t contestId;
-         uint64_t amount;
-         bool priceUnavailable;
-         bool open;
-         checksum256 videoHash360p;
-         checksum256 videoHash480p;
-         checksum256 videoHash720p;
-         checksum256 videoHash1080p;
-         checksum256 coverHash;
-         uint32_t createdAt;
-         uint32_t votes;
-         
-         uint64_t primary_key() const { return id.value; }
-         checksum256 by_userid_levelid() const {
-            return composite_key(userId.value, levelId.value, open);
-         }
-         uint64_t bycontest() const {
-            return contestId;
-         }
-      };
-      
-      typedef eosio::multi_index<
-         name("entries"), 
-         contestEntry,
-         indexed_by<name("byuserandlvl"), const_mem_fun<contestEntry, checksum256, &contestEntry::by_userid_levelid>>,
-         indexed_by<name("bycontest"), const_mem_fun<contestEntry, uint64_t, &contestEntry::bycontest>>
-      > entries_index;
-
-      /*
-         TABLE: contests
-      */
-      struct [[eosio::table]] contest {
-         uint64_t id;
-         name levelId;
-         uint64_t price;
-         uint32_t participantLimit;
-         uint32_t participantCount;
-         bool submissionsClosed;
-         uint32_t submissionPeriod;
-         uint32_t votePeriod;
-         uint32_t createdAt;
-         bool paid;
-
-         uint64_t primary_key() const { return id; }
-         uint128_t bylevel() const { return composite_key(levelId.value, submissionsClosed); }
-         uint64_t byendtime() const { return createdAt + submissionPeriod + votePeriod; }
-      };
-
-      typedef eosio::multi_index<
-         name("contests"),
-         contest,
-         indexed_by<name("bylevel"), const_mem_fun<contest, uint128_t, &contest::bylevel>>,
-         indexed_by<name("byendtime"), const_mem_fun<contest, uint64_t, &contest::byendtime>>
-      > contest_index;
-
-      /*
-         TABLE: votes
-      */
-      struct [[eosio::table]] entryvote {
-         uint64_t id;
-         uint64_t contestId;
-         name entryId;
-         name voterUserId;
-         uint32_t createdAt;
-
-         uint64_t primary_key() const { return id; }
-         uint128_t byusercontest() const { return composite_key(contestId, voterUserId.value); }
-      };
-
-      typedef eosio::multi_index<
-         name("votes"), 
-         entryvote,
-         indexed_by<name("byusrcontest"), const_mem_fun<entryvote, uint128_t, &entryvote::byusercontest>>
-      > vote_index;
 };

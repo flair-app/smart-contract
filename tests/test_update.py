@@ -440,6 +440,60 @@ class UpdateActionsUnitTest(unittest.TestCase):
         time.sleep(3)
         HOST.push_action("update", force_unique=True, permission=(HOST, Permission.ACTIVE))
 
+    def test_update_action_activates_priceUnavailable_entries_that_have_prices(self):
+        #set entry exp forward from price freshness to ensure price freshness check
+        HOST.push_action(
+            "setentryexp",
+            [2000],
+            permission=(HOST, Permission.ACTIVE),
+            force_unique=1
+        )
+
+        HOST.push_action(
+            "setpricefrsh",
+            [1],
+            permission=(HOST, Permission.ACTIVE),
+            force_unique=1
+        )
+
+        time.sleep(3)
+
+        TOKENHOST.push_action(
+            "transfer",
+            {
+                "from": self.ALICE,
+                "to": HOST,
+                "quantity": "2.0000 EOS",
+                "memo": self.entryId,
+            },
+            force_unique=True,
+            permission=(self.ALICE, Permission.ACTIVE)
+        )
+
+        HOST.push_action(
+            "addeoshigh",
+            {
+                "openTime": int(time.time()),
+                "usdHigh": 50000, # $5.0000
+                "intervalSec": 2, # 2 seconds
+            },
+            permission=(HOST, Permission.ACTIVE),
+            force_unique=1
+        )
+        HOST.push_action("update", force_unique=True, permission=(HOST, Permission.ACTIVE))
+
+        entriesRes = HOST.table("entries", HOST, lower=self.entryId, key_type="name")
+        entry = entriesRes.json["rows"][0]
+        self.assertEqual(entry["id"], self.entryId)
+        self.assertEqual(entry["priceUnavailable"], 0)
+        self.assertEqual(entry["amount"], 20000)
+        contestId = entry["contestId"]
+        self.assertGreater(contestId, 0)
+
+        # go ahead payout now to prevent from having side effects on later tests. 
+        time.sleep(5)
+        HOST.push_action("update", force_unique=True, permission=(HOST, Permission.ACTIVE))
+
     @classmethod
     def tearDownClass(cls):
         stop()
