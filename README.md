@@ -114,12 +114,14 @@ Transfer user's winnings to specified destination.
 **Parameters:**
 - `name` id
 - `string` name
+- `uint32` maxVideoLength *(specified as seconds)*
 
 **Example Data:**
     
     {
         "id": "music",
-        "name": "Music"
+        "name": "Music",
+        "maxVideoLength": "30",
     }
 
 ## **createlevel (Create Level)**
@@ -130,7 +132,6 @@ Transfer user's winnings to specified destination.
   - `name` id
   - `name` categoryId
   - `string` name
-  - `uint32` maxVideoLength *(specified as seconds)*
   - `uint32` price *(specified in USD as cents)*
   - `uint32` participantLimit
   - `uint32` submissionPeriod *(specified as hours)*
@@ -143,7 +144,6 @@ Transfer user's winnings to specified destination.
             "id": "music_gold",
             "categoryId": "music",
             "name": "Gold",
-            "maxVideoLength": 30,
             "price": 1000,
             "participantLimit": 100,
             "submissionPeriod": 12,
@@ -162,6 +162,7 @@ Transfer user's winnings to specified destination.
 - data
   - `string` name
   - `bool` archived
+  - `uint32` maxVideoLength *(specified as seconds)*
   
 
 **Example Data:**
@@ -170,7 +171,8 @@ Transfer user's winnings to specified destination.
         "id": "music",
         "data": {
             "name": "Music 2",
-            "archived": false
+            "archived": false,
+            "maxVideoLength": "30",
         }
     }
 
@@ -186,7 +188,6 @@ Transfer user's winnings to specified destination.
   - `name` categoryId
   - `string` name
   - `bool` archived
-  - `uint32` maxVideoLength *(specified as seconds)*
   - `uint32` price *(specified in USD as cents)*
   - `uint32` participantLimit
   - `uint32` submissionPeriod *(specified as hours)*
@@ -200,7 +201,6 @@ Transfer user's winnings to specified destination.
             "categoryId": "music",
             "name": "Gold",
             "archived": false,
-            "maxVideoLength": 30,
             "price": 1000,
             "participantLimit": 100,
             "submissionPeriod": 12,
@@ -280,6 +280,23 @@ Transfer user's winnings to specified destination.
             "videoHash720p": "fa5546d484d063b85...",
             "videoHash1080p": "d7328edbe89e6e12..."
         }
+    }
+
+## **refundentry (Refund Entry)**
+**Authorization:** 
+- Requires auth of the account associated to `userId` of entry `id` parameter 
+
+**Parameters:**
+- `name` id *(entry's id)*
+- `name` to
+- `string` memo
+
+**Example Data:**
+    
+    {
+        "id": "entryid123",
+        "to": "cryptocat1234",
+        "memo": "Test"
     }
 
 ## **vote (Vote)**
