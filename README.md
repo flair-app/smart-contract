@@ -45,6 +45,7 @@ cleos set contract your_contract_account_name $(pwd)/build -p your_account@activ
   - [**editprofadm (Edit Profile as Admin)**](#editprofadm-edit-profile-as-admin)
   - [**editprofuser (Edit Profile as User)**](#editprofuser-edit-profile-as-user)
   - [**entercontest (Enter Contest)**](#entercontest-enter-contest)
+  - [**refundentry (Refund Entry)**](#refundentry-refund-entry)
   - [**vote (Vote)**](#vote-vote)
 
 ## **addeoshigh (Add EOS High)**
