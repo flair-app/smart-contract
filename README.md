@@ -37,7 +37,6 @@ cleos set contract your_contract_account_name $(pwd)/build -p your_account@activ
 # Smart Contract Actions
   - [**addeoshigh (Set EOS 12 Hour High)**](#addeoshigh-set-eos-12-hour-high)
   - [**addprofile (Add/Create Profile)**](#addprofile-addcreate-profile)
-  - [**claimfunds (Claim Funds)**](#claimfunds-claim-funds)
   - [**createcat (Create Category)**](#createcat-create-category)
   - [**createlevel (Create Level)**](#createlevel-create-level)
   - [**editcat (Edit Category)**](#editcat-edit-category)
@@ -89,24 +88,6 @@ Keeps a list of eos highs for 12 hours. The collection of the eos price high is 
             "account": "bob",
             "active": "true"
         }
-    }
-
-## **claimfunds (Claim Funds)**
-Transfer user's winnings to specified destination.
-
-**Authorization:** Requires auth of the parameter `user`
-
-**Parameters:**
-- `string` user
-- `name` to
-- `string` memo
-
-**Example Data:**
-    
-    {
-        "user": "bob", 
-        "to": "coinbase", 
-        "memo": "12398712"
     }
 
 ## **createcat (Create Category)**
