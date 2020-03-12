@@ -1,11 +1,11 @@
 # Prerequisites 
 You'll need the following items installed:
-- [EOSIO v1.8.0](https://developers.eos.io/eosio-home/docs/setting-up-your-environment)
-- [eosio.cdt v1.6.1](https://developers.eos.io/eosio-home/docs/installing-the-contract-development-toolkit)
+- [EOSIO v2.0.3](https://developers.eos.io/eosio-home/docs/setting-up-your-environment)
+- [eosio.cdt v1.7.0](https://developers.eos.io/eosio-home/docs/installing-the-contract-development-toolkit)
 - Python 3.5 or higher
 - pip3 18.1 or higher
 - [EOSFactory](https://eosfactory.io/build/html/tutorials/01.InstallingEOSFactory.html)
-
+    - *Note: There's currently a bug in EOSFactory when using eosio 2.0. See https://github.com/tokenika/eosfactory/issues/184 for temp solution.*
 # Tests
 Tests are written utilizing EOSFactory which uses python3.
 

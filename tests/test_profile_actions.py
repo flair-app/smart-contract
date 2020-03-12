@@ -217,54 +217,76 @@ class ProfileActionsUnitTest(unittest.TestCase):
                 )
 
     def test_profile_lookup_by_username(self):
-        username = "testusername"
-        HOST.push_action(
-            "addprofile",
-            [{
-                "id":username,
-                "username":username,
-                "imgHash":"950fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9",
-                "account":ALICE,
-                "active":True,
-            }],
-            permission=(HOST, Permission.ACTIVE)
-        )
+        # username = "tester1"
 
-        usernameHash = hashlib.sha256(username.encode())
+        usernames = [
+            "tester2",
+            "t.e.s.t.e.r2",
+            "1test3",
+            "TeStEr2",
+            "abcdefghijkmnopqrstuvxz1234781",
+        ]
 
-        COMMENT(
-            '''
-            usernameHash    : {usernameHash}
-            '''
-            .format(
-                usernameHash=usernameHash.hexdigest(), 
+        idPostfix = "123"
+        idIndex = 0
+
+        for username in usernames: 
+            idIndex += 1
+            if (idIndex > 5):
+                idPostfix = idPostfix + "5"
+                idIndex = 1
+            accountname = "acct" + idPostfix + str(idIndex)
+            create_account(accountname, MASTER, accountname)
+
+            HOST.push_action(
+                "addprofile",
+                [{
+                    "id":idPostfix+str(idIndex),
+                    "username":username,
+                    "imgHash":"950fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9",
+                    "account":accountname,
+                    "active":True,
+                }],
+                permission=(HOST, Permission.ACTIVE)
             )
-        )
 
-        def hexLittleEndian(str):
-            hexLE = ""
+            usernameHash = hashlib.sha256(username.encode())
 
-            for i in reversed(range(0, 30, 2)):
-                iEnd = i + 1
-                str[i:iEnd]
-                hexLE = hexLE + str
+            COMMENT(
+                '''
+                usernameHash    : {usernameHash}
+                '''
+                .format(
+                    usernameHash=usernameHash.hexdigest(), 
+                )
+            )
 
-            return hexLE
+            def hexLittleEndian(str):
+                hexLE = ""
 
-        def shaKeyEncoding(str):
-            return hexLittleEndian(str[0:15]) + hexLittleEndian(str[16:31])
+                for i in reversed(range(0, 30, 2)):
+                    iEnd = i + 1
+                    str[i:iEnd]
+                    hexLE = hexLE + str
 
-        tableRes = HOST.table("profiles", HOST, lower=shaKeyEncoding(usernameHash.hexdigest()), limit=1, key_type="sha256", index=2)
-        tableData = json.loads(tableRes.out_msg)
+                return hexLE
 
-        self.assertEqual(tableData["rows"], [{
-            "id":username,
-            "username":username,
-            "usernameHash":usernameHash.hexdigest(),
-            "imgHash":"950fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9",
-            "account": str(ALICE),
-            "active": 1,
-        }])
+            def shaKeyEncoding(str):
+                return hexLittleEndian(str[0:15]) + hexLittleEndian(str[16:31])
+            
+            # tableRes = HOST.table("profiles", HOST, lower=shaKeyEncoding(usernameHash.hexdigest()), limit=1, key_type="sha256", index=2)
+            tableRes = HOST.table("profiles", HOST, lower=usernameHash.hexdigest(), upper=usernameHash.hexdigest(), limit=1, key_type="sha256", index=2)
+            tableData = json.loads(tableRes.out_msg)
+
+            print(usernameHash.hexdigest(), shaKeyEncoding(usernameHash.hexdigest()))
+            self.assertEqual(tableData["rows"], [{
+                "id":idPostfix+str(idIndex),
+                "username":username,
+                "usernameHash":usernameHash.hexdigest(),
+                "imgHash":"950fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9",
+                "account": accountname,
+                "active": 1,
+            }])
 
     def test_edit_profile_modifies_table_when_user_auth(self):
         SCENARIO('''
