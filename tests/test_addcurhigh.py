@@ -12,7 +12,7 @@ HOST = Account()
 ALICE = Account()
 BOB = Account()
 
-class addeoshighUnitTest(unittest.TestCase):
+class addcurhighUnitTest(unittest.TestCase):
 
     def run(self, result=None):
         super().run(result)
@@ -37,12 +37,19 @@ class addeoshighUnitTest(unittest.TestCase):
             force_unique=1
         )
 
+        HOST.push_action(
+            "setcurrency",
+            ["EOS"],
+            permission=(HOST, Permission.ACTIVE),
+            force_unique=1
+        )
+
     def setUp(self):
         pass
 
-    def test_add_eos_high_saves_fields_into_table_and_deletes_existings_rows_older_than_12_hours(self):
+    def test_add_currency_high_saves_fields_into_table_and_deletes_existings_rows_older_than_12_hours(self):
         SCENARIO('''
-        test_add_eos_high_saves_fields_into_table_and_deletes_existings_rows_older_than_12_hours
+        test_add_currency_high_saves_fields_into_table_and_deletes_existings_rows_older_than_12_hours
         ''')
 
         ts = int(time.time())
@@ -50,7 +57,7 @@ class addeoshighUnitTest(unittest.TestCase):
         intervalSec = 900
 
         HOST.push_action(
-            "addeoshigh",
+            "addcurhigh",
             {
                 "openTime":ts,
                 "usdHigh":usdHigh,
@@ -65,7 +72,7 @@ class addeoshighUnitTest(unittest.TestCase):
         usdHigh2 = usdHigh + 10000 # + $1.0000
 
         HOST.push_action(
-            "addeoshigh",
+            "addcurhigh",
             {
                 "openTime":ts2,
                 "usdHigh":usdHigh2,
@@ -77,7 +84,7 @@ class addeoshighUnitTest(unittest.TestCase):
 
         # second expired price to confirm looping functionality
         HOST.push_action(
-            "addeoshigh",
+            "addcurhigh",
             {
                 "openTime":ts2 - 1,
                 "usdHigh":usdHigh2,
@@ -93,7 +100,7 @@ class addeoshighUnitTest(unittest.TestCase):
         usdHigh3 = usdHigh + 10000 # + $1.0000
 
         HOST.push_action(
-            "addeoshigh",
+            "addcurhigh",
             {
                 "openTime":ts3,
                 "usdHigh":usdHigh3,
@@ -103,7 +110,7 @@ class addeoshighUnitTest(unittest.TestCase):
             force_unique=1
         )
         
-        tableRes = HOST.table("eosprices", HOST)
+        tableRes = HOST.table("curprices", HOST)
 
         tableData = json.loads(tableRes.out_msg)
 
@@ -123,9 +130,9 @@ class addeoshighUnitTest(unittest.TestCase):
             ]
         )
 
-    def test_add_eos_high_saves_fails_when_not_within_12_hour_period(self):
+    def test_add_currency_high_saves_fails_when_not_within_12_hour_period(self):
         SCENARIO('''
-        test_add_eos_high_saves_fails_when_not_within_12_hour_period
+        test_add_currency_high_saves_fails_when_not_within_12_hour_period
         ''')
 
         hourSec = 3600
@@ -135,7 +142,7 @@ class addeoshighUnitTest(unittest.TestCase):
 
         with self.assertRaises(Error):
             HOST.push_action(
-                "addeoshigh",
+                "addcurhigh",
                 {
                     "openTime":ts,
                     "usdHigh":usdHigh,
@@ -145,9 +152,9 @@ class addeoshighUnitTest(unittest.TestCase):
                 force_unique=1
             )
 
-    def test_add_eos_high_requires_auth_of_self(self):
+    def test_add_currency_high_requires_auth_of_self(self):
         SCENARIO('''
-        test_add_eos_high_requires_auth_of_self
+        test_add_currency_high_requires_auth_of_self
         ''')
 
         with self.assertRaises(MissingRequiredAuthorityError):
@@ -156,7 +163,7 @@ class addeoshighUnitTest(unittest.TestCase):
             intervalSec = 900
 
             HOST.push_action(
-                "addeoshigh",
+                "addcurhigh",
                 {
                     "openTime":ts,
                     "usdHigh":usdHigh,

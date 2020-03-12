@@ -217,42 +217,42 @@ class [[eosio::contract("flair")]] flair : public contract {
       }
 
       /*
-         SET EOS 12 HOUR HIGH
+         SET CURRENCY 12 HOUR HIGH
       */
       [[eosio::action]]
-      void addeoshigh(uint32_t openTime, uint32_t usdHigh, uint32_t intervalSec) {
+      void addcurhigh(uint32_t openTime, uint32_t usdHigh, uint32_t intervalSec) {
          require_auth(_self);
 
          uint32_t curEpoch = eosio::current_time_point().sec_since_epoch();
-         uint32_t EOSPriceStoreLifeSec = get_option_int(name{"entryexp"});
-         uint32_t EOSPriceExpTime = curEpoch - EOSPriceStoreLifeSec;
+         uint32_t CurPriceStoreLifeSec = get_option_int(name{"entryexp"});
+         uint32_t CurPriceExpTime = curEpoch - CurPriceStoreLifeSec;
 
-         check(openTime > EOSPriceExpTime, "Open time must be within last 12 hours");
+         check(openTime > CurPriceExpTime, "Open time must be within last 12 hours");
 
-         eosprice_index eosprices(_self, _self.value);
+         curprice_index curprices(_self, _self.value);
          
          // DELETE EXPIRED PRICES
-         auto oldPriceIter = eosprices.lower_bound(EOSPriceExpTime);
+         auto oldPriceIter = curprices.lower_bound(CurPriceExpTime);
          bool done = false;
          while(
             !done
-            && oldPriceIter != eosprices.end()
+            && oldPriceIter != curprices.end()
          ) {
-            if (oldPriceIter == eosprices.begin()) {
+            if (oldPriceIter == curprices.begin()) {
                done = true;
             }
 
-            bool isPriceExpired = oldPriceIter->openTime < EOSPriceExpTime;
+            bool isPriceExpired = oldPriceIter->openTime < CurPriceExpTime;
             if(isPriceExpired) {
-               print("(Notice) Expired EOS Price found: erase ", oldPriceIter->openTime, "\n");
-               oldPriceIter = eosprices.erase(oldPriceIter);
-            } else if(oldPriceIter != eosprices.begin()) {
+               print("(Notice) Expired Currency Price found: erase ", oldPriceIter->openTime, "\n");
+               oldPriceIter = curprices.erase(oldPriceIter);
+            } else if(oldPriceIter != curprices.begin()) {
                oldPriceIter--;
             }
          }
 
          // ADD NEW PRICE
-         eosprices.emplace(_self, [&]( eosprice& row ) {
+         curprices.emplace(_self, [&]( curprice& row ) {
             row.openTime = openTime;
             row.usdHigh = usdHigh;
             row.intervalSec = intervalSec;
@@ -345,7 +345,11 @@ class [[eosio::contract("flair")]] flair : public contract {
       */
       [[eosio::on_notify("eosio.token::transfer")]]
       void deposit(name from, name to, asset quantity, std::string memo) {
-         if (to != _self || quantity.symbol.code().to_string() != "EOS") {
+         std::string currency = get_option(name{'currency'});
+         if (to != _self || quantity.symbol.code().to_string() != currency) {
+            if (quantity.symbol.code().to_string() != currency) {
+               print("Currency doesn't match: ", quantity.symbol.code().to_string(), " != ", currency);
+            }
             return;
          }
 
@@ -387,7 +391,7 @@ class [[eosio::contract("flair")]] flair : public contract {
          print(id, " ", entryItr->contestId, " ", entryItr->amount, "\n");
 
          int64_t a = static_cast<int64_t>(entryItr->amount);
-         symbol s = symbol{"EOS", 4};
+         symbol s = symbol{get_option(name{'currency'}), 4};
          asset refundAmt = asset{a, s};
 
          print("refund amt: ", refundAmt, "a: ", a, "s: ", s, "\n");
@@ -464,6 +468,16 @@ class [[eosio::contract("flair")]] flair : public contract {
          require_auth( _self );
          set_option(name{"feeacct"}, account.to_string());
          set_option(name{"feeacctmemo"}, memo);
+      }
+
+      /*
+         Set Currency
+      */
+      [[eosio::action]]
+      void setcurrency(std::string curSymbol) {
+         require_auth( _self );
+         set_option(name{'currency'}, curSymbol);
+         print("setcurrency", name{'currency'}, " ", curSymbol);
       }
 
       /*
@@ -544,9 +558,9 @@ class [[eosio::contract("flair")]] flair : public contract {
       typedef eosio::multi_index<name("options"), option> option_index;
 
       /*
-         TABLE: eosprices
+         TABLE: curprices
       */
-      struct [[eosio::table]] eosprice {
+      struct [[eosio::table]] curprice {
          uint64_t openTime;
          uint32_t usdHigh; // represented as one hundredth of a cent ($1.00 * 1000)
          uint32_t intervalSec;
@@ -556,10 +570,10 @@ class [[eosio::contract("flair")]] flair : public contract {
       };
 
       typedef eosio::multi_index<
-         name("eosprices"),
-         eosprice,
-         indexed_by<name("byendtime"), const_mem_fun<eosprice, uint64_t, &eosprice::endtime_key>>
-      > eosprice_index;
+         name("curprices"),
+         curprice,
+         indexed_by<name("byendtime"), const_mem_fun<curprice, uint64_t, &curprice::endtime_key>>
+      > curprice_index;
 
       /*
          TABLE: entries
@@ -692,10 +706,10 @@ class [[eosio::contract("flair")]] flair : public contract {
             auto levelItr = levels.find(contestItr->levelId.value);
             uint64_t feeAmount = (contestPrize * 10) / levelItr->fee;
             uint64_t prizeRemainder = contestPrize;
-            uint64_t winnerPrice = (contestPrize - feeAmount) / winners.size();
+            uint64_t winnerPrize = (contestPrize - feeAmount) / winners.size();
 
             for (auto winner = winners.begin(); winner != winners.end(); ++winner){
-               prizeRemainder -= winnerPrice;
+               prizeRemainder -= winnerPrize;
 
                profile_index profiles(_self, _self.value);
                auto profileItr = profiles.find(*winner);
@@ -703,8 +717,8 @@ class [[eosio::contract("flair")]] flair : public contract {
                   continue;
                }
 
-               int64_t a = static_cast<int64_t>(winnerPrice);
-               symbol s = symbol{"EOS", 4};
+               int64_t a = static_cast<int64_t>(winnerPrize);
+               symbol s = symbol{get_option(name{'currency'}), 4};
                asset amt = asset{a, s};
 
                action{
@@ -716,7 +730,7 @@ class [[eosio::contract("flair")]] flair : public contract {
             }
 
             int64_t a = static_cast<int64_t>(prizeRemainder);
-            symbol s = symbol{"EOS", 4};
+            symbol s = symbol{get_option(name{'currency'}), 4};
             asset amt = asset{a, s};
             name feeacct(get_option(name{"feeacct"}));
             std::string feeacctmemo = get_option(name{"feeacctmemo"});
@@ -877,8 +891,8 @@ class [[eosio::contract("flair")]] flair : public contract {
          }
 
          // determine eos price high since entry created
-         eosprice_index eosprices(_self, _self.value);
-         auto pricesByEndTime = eosprices.get_index<name("byendtime")>();
+         curprice_index curprices(_self, _self.value);
+         auto pricesByEndTime = curprices.get_index<name("byendtime")>();
          auto priceItr = pricesByEndTime.lower_bound(entryItr->createdAt);
 
          uint64_t priceHigh = 0;
@@ -890,7 +904,7 @@ class [[eosio::contract("flair")]] flair : public contract {
             }
          }
 
-         // mark entry as priceUnavailable if lastest EOS price openTime + intervalSec is older than the set required price freshness
+         // mark entry as priceUnavailable if lastest currency price openTime + intervalSec is older than the set required price freshness
          uint64_t freshTime = get_option_int(name{"pricefresh"});
          auto lastPrice = --pricesByEndTime.end();
          bool freshPrice = (lastPrice->openTime + lastPrice->intervalSec) + freshTime > now;
@@ -900,7 +914,7 @@ class [[eosio::contract("flair")]] flair : public contract {
                row.priceUnavailable = true;
             });
 
-            print("EOS Price Unavailable: run update action to recheck once price has been updated.\n");
+            print("Currency Price Unavailable: run update action to recheck once price has been updated.\n");
             return false;
          }
 

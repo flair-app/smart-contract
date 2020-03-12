@@ -190,6 +190,13 @@ class ContestActionsUnitTest(unittest.TestCase):
             permission=(HOST, Permission.ACTIVE)
         )
 
+        HOST.push_action(
+            "setcurrency",
+            ["EOS"],
+            permission=(HOST, Permission.ACTIVE),
+            force_unique=1
+        )
+
     def randomEOSIOId(self):
         allowChar = "abcdefghijklmnopqrstuvwxyz12345."
         
@@ -235,7 +242,7 @@ class ContestActionsUnitTest(unittest.TestCase):
         )
 
         HOST.push_action(
-            "addeoshigh",
+            "addcurhigh",
             {
                 "openTime": int(time.time()),
                 "usdHigh": 50000, # $5.0000
@@ -543,7 +550,7 @@ class ContestActionsUnitTest(unittest.TestCase):
         time.sleep(3)
 
         HOST.push_action(
-            "addeoshigh",
+            "addcurhigh",
             {
                 "openTime": int(time.time()),
                 "usdHigh": 50000, # $5.0000
@@ -821,7 +828,7 @@ class ContestActionsUnitTest(unittest.TestCase):
             permission=(ALICE, Permission.ACTIVE)
         )
 
-        HOST.table("eosprices", HOST, limit=100)
+        HOST.table("curprices", HOST, limit=100)
 
         TOKENHOST.push_action(
             "transfer",
@@ -890,7 +897,7 @@ class ContestActionsUnitTest(unittest.TestCase):
         time.sleep(5)
 
         HOST.push_action(
-            "addeoshigh",
+            "addcurhigh",
             {
                 "openTime": int(time.time()),
                 "usdHigh": 50000, # $5.0000

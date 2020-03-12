@@ -18,7 +18,7 @@ python3 -m unittest discover --pattern=*.py
 **Run A Specific Test**
 ```
 cd tests
-python3 -m unittest discover --pattern=test_addeoshigh.py
+python3 -m unittest discover --pattern=test_addcurhigh.py
 ```
 
 # Building
@@ -35,7 +35,7 @@ cleos set contract your_contract_account_name $(pwd)/build -p your_account@activ
 ```
 
 # Smart Contract Actions
-  - [**addeoshigh (Set EOS 12 Hour High)**](#addeoshigh-set-eos-12-hour-high)
+  - [**addcurhigh (Set Currency 12 Hour High)**](#addcurhigh-add-currency-high)
   - [**addprofile (Add/Create Profile)**](#addprofile-addcreate-profile)
   - [**createcat (Create Category)**](#createcat-create-category)
   - [**createlevel (Create Level)**](#createlevel-create-level)
@@ -47,7 +47,7 @@ cleos set contract your_contract_account_name $(pwd)/build -p your_account@activ
   - [**refundentry (Refund Entry)**](#refundentry-refund-entry)
   - [**vote (Vote)**](#vote-vote)
 
-## **addeoshigh (Add EOS High)**
+## **addcurhigh (Add Currency High)**
 
 Keeps a list of eos highs for 12 hours. The collection of the eos price high is used to calculate the amount of EOS needed for entries.
 

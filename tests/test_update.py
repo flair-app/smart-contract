@@ -62,6 +62,13 @@ class UpdateActionsUnitTest(unittest.TestCase):
             permission=(HOST, Permission.ACTIVE)
         )
 
+        HOST.push_action(
+            "setcurrency",
+            ["EOS"],
+            permission=(HOST, Permission.ACTIVE),
+            force_unique=1
+        )
+
     def randomEOSIOId(self):
         allowChar = "abcdefghijklmnopqrstuvwxyz12345."
         
@@ -121,7 +128,7 @@ class UpdateActionsUnitTest(unittest.TestCase):
             force_unique=True,
             permission=(MASTER, Permission.ACTIVE)
         )
-
+        
         self.userId = self.randomEOSIOId()
 
         HOST.push_action(
@@ -219,7 +226,7 @@ class UpdateActionsUnitTest(unittest.TestCase):
         )
 
         HOST.push_action(
-            "addeoshigh",
+            "addcurhigh",
             {
                 "openTime": int(time.time()),
                 "usdHigh": 50000, # $5.0000
@@ -471,7 +478,7 @@ class UpdateActionsUnitTest(unittest.TestCase):
         )
 
         HOST.push_action(
-            "addeoshigh",
+            "addcurhigh",
             {
                 "openTime": int(time.time()),
                 "usdHigh": 50000, # $5.0000
@@ -483,6 +490,7 @@ class UpdateActionsUnitTest(unittest.TestCase):
         HOST.push_action("update", force_unique=True, permission=(HOST, Permission.ACTIVE))
 
         entriesRes = HOST.table("entries", HOST, lower=self.entryId, key_type="name")
+        print(entriesRes)
         entry = entriesRes.json["rows"][0]
         self.assertEqual(entry["id"], self.entryId)
         self.assertEqual(entry["priceUnavailable"], 0)
