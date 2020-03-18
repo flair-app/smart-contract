@@ -337,6 +337,55 @@ class ProfileActionsUnitTest(unittest.TestCase):
             "active": 1,
         }])
 
+    def test_edit_profile_with_same_username_modifies_table_when_user_auth(self):
+        SCENARIO('''
+        test_edit_profile_with_same_username_modifies_table_when_user_auth
+        ''')
+
+        id = "cryptocat334"
+        username = "cryptocat334"
+        imgHash = "950fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+        usernameEdit = "cryptocat334"
+        imgHashEdit = "850fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+
+        HOST.push_action(
+            "addprofile",
+            [{
+                "id":id,
+                "username":username,
+                "imgHash":imgHash,
+                "account": str(ALICE),
+                "active": True,
+            }],
+            permission=(HOST, Permission.ACTIVE)
+        )
+
+        HOST.push_action(
+            "editprofuser",
+            [
+                id,
+                {
+                    "username":usernameEdit,
+                    "imgHash":imgHashEdit,
+                }
+            ],
+            permission=(ALICE, Permission.ACTIVE)
+        )
+
+        usernameHash = hashlib.sha256(usernameEdit.encode())
+        
+        tableRes = HOST.table("profiles", HOST, lower=id, key_type="name", limit=1)
+        tableData = json.loads(tableRes.out_msg)
+
+        self.assertEqual(tableData["rows"], [{
+            "id":id,
+            "username":usernameEdit,
+            "usernameHash":usernameHash.hexdigest(),
+            "imgHash":imgHashEdit,
+            "account": str(ALICE),
+            "active": 1,
+        }])
+
     def test_edit_profile_as_user_requires_auth_user(self):
         id = "testing444"
         HOST.push_action(
@@ -415,6 +464,57 @@ class ProfileActionsUnitTest(unittest.TestCase):
         username = "cryptocat456"
         imgHash = "950fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
         usernameEdit = "cryptocat567"
+        imgHashEdit = "850fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+
+        HOST.push_action(
+            "addprofile",
+            [{
+                "id":id,
+                "username":username,
+                "imgHash":imgHash,
+                "account": str(ALICE),
+                "active": True,
+            }],
+            permission=(HOST, Permission.ACTIVE)
+        )
+
+        HOST.push_action(
+            "editprofadm",
+            [
+                id,
+                {
+                    "username":usernameEdit,
+                    "imgHash":imgHashEdit,
+                    "account": str(BOB),
+                    "active": False,
+                }
+            ],
+            permission=(HOST, Permission.ACTIVE)
+        )
+
+        usernameHash = hashlib.sha256(usernameEdit.encode())
+        
+        tableRes = HOST.table("profiles", HOST, lower=id, key_type="name", limit=1)
+        tableData = json.loads(tableRes.out_msg)
+
+        self.assertEqual(tableData["rows"], [{
+            "id":id,
+            "username":usernameEdit,
+            "usernameHash":usernameHash.hexdigest(),
+            "imgHash":imgHashEdit,
+            "account": str(BOB),
+            "active": 0,
+        }])
+    
+    def test_edit_profile_with_same_username_modifies_table_when_admin_auth(self):
+        SCENARIO('''
+        test_edit_profile_with_same_username_modifies_table_when_admin_auth
+        ''')
+
+        id = "5555"
+        username = "cryptocat556"
+        imgHash = "950fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+        usernameEdit = "cryptocat556"
         imgHashEdit = "850fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
 
         HOST.push_action(

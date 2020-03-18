@@ -172,9 +172,11 @@ class [[eosio::contract("flair")]] flair : public contract {
 
          checksum256 usernameHash = sha256(&data.username[0], data.username.size());
 
-         auto byUsernameHashIdx = profiles.get_index<name("byusername")>();
-         auto existingUsernameProfile = byUsernameHashIdx.find(usernameHash);
-         check(existingUsernameProfile->username != data.username, "Username already exists.");
+         if (userProfile->username != data.username) {
+            auto byUsernameHashIdx = profiles.get_index<name("byusername")>();
+            auto existingUsernameProfile = byUsernameHashIdx.find(usernameHash);
+            check(existingUsernameProfile->username != data.username, "Username already exists.");
+         }
 
          profiles.modify(userProfile, _self, [&](profile& row) {
             row.id = id;
@@ -202,9 +204,11 @@ class [[eosio::contract("flair")]] flair : public contract {
          auto userProfile = profiles.find(id.value);
          checksum256 usernameHash = sha256(&data.username[0], data.username.size());
 
-         auto byUsernameHashIdx = profiles.get_index<name("byusername")>();
-         auto existingUsernameProfile = byUsernameHashIdx.find(usernameHash);
-         check(existingUsernameProfile->username != data.username, "Username already exists.");
+         if (userProfile->username != data.username) {
+            auto byUsernameHashIdx = profiles.get_index<name("byusername")>();
+            auto existingUsernameProfile = byUsernameHashIdx.find(usernameHash);
+            check(existingUsernameProfile->username != data.username, "Username already exists.");
+         }
 
          profiles.modify(userProfile, _self, [&](profile& row) {
             row.id = id;
@@ -284,8 +288,6 @@ class [[eosio::contract("flair")]] flair : public contract {
          name id;
          name userId;
          name levelId;
-         checksum256 videoHash360p;
-         checksum256 videoHash480p;
          checksum256 videoHash720p;
          checksum256 videoHash1080p;
          checksum256 coverHash;
@@ -326,8 +328,6 @@ class [[eosio::contract("flair")]] flair : public contract {
             row.id = params.id;
             row.userId = params.userId;
             row.levelId = params.levelId;
-            row.videoHash360p = params.videoHash360p;
-            row.videoHash480p = params.videoHash480p;
             row.videoHash720p = params.videoHash720p;
             row.videoHash1080p = params.videoHash1080p;
             row.coverHash = params.coverHash;
@@ -586,8 +586,6 @@ class [[eosio::contract("flair")]] flair : public contract {
          uint64_t amount;
          bool priceUnavailable;
          bool open;
-         checksum256 videoHash360p;
-         checksum256 videoHash480p;
          checksum256 videoHash720p;
          checksum256 videoHash1080p;
          checksum256 coverHash;
@@ -604,6 +602,12 @@ class [[eosio::contract("flair")]] flair : public contract {
          uint64_t bypriceunavail() const {
             return priceUnavailable;
          }
+         checksum256 byvidhashsm() const {
+            return videoHash720p;
+         }
+         checksum256 byvidhashlg() const {
+            return videoHash1080p;
+         }
       };
       
       typedef eosio::multi_index<
@@ -611,7 +615,9 @@ class [[eosio::contract("flair")]] flair : public contract {
          contestEntry,
          indexed_by<name("byuserandlvl"), const_mem_fun<contestEntry, checksum256, &contestEntry::by_userid_levelid>>,
          indexed_by<name("bycontest"), const_mem_fun<contestEntry, uint64_t, &contestEntry::bycontest>>,
-         indexed_by<name("bynoprice"), const_mem_fun<contestEntry, uint64_t, &contestEntry::bypriceunavail>>
+         indexed_by<name("bynoprice"), const_mem_fun<contestEntry, uint64_t, &contestEntry::bypriceunavail>>,
+         indexed_by<name("byvidhashsm"), const_mem_fun<contestEntry, checksum256, &contestEntry::byvidhashsm>>,
+         indexed_by<name("byvidhashlg"), const_mem_fun<contestEntry, checksum256, &contestEntry::byvidhashlg>>
       > entries_index;
 
       /*
