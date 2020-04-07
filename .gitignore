@@ -159,3 +159,10 @@ dmypy.json
 
 # VSCODE
 .vscode
+
+# EOSIO
+*.wasm
+*.abi
+
+# MAC
+.DS_Store
