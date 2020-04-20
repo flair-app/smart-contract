@@ -24,8 +24,7 @@ python3 -m unittest discover --pattern=test_addcurhigh.py
 # Building
 Navigation to the root directory of repo run:
 ```
-mkdir -p build
-python3 -m eosfactory.build $(pwd)
+eosio-cpp $(pwd)/src/flair.cpp -o $(pwd)/flair.wasm
 ```
 
 # Deploying

@@ -491,6 +491,11 @@ class [[eosio::contract("flair")]] flair : public contract {
          checkUnavailablePriceEntries();
       }
 
+      [[eosio::action]]
+      void paycpu() {
+         // noop
+      }
+
    private:
       /*
          TABLE: categories
