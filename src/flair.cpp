@@ -736,7 +736,7 @@ class [[eosio::contract("flair")]] flair : public contract {
                   permission_level{get_self(), name("active")},
                   name("eosio.token"),
                   name("transfer"),
-                  std::make_tuple(get_self(), profileItr->account, amt, contestItr->id)
+                  std::make_tuple(get_self(), profileItr->account, amt, std::to_string(contestItr->id))
                }.send();
             }
 
