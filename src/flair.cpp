@@ -699,7 +699,7 @@ class [[eosio::contract("flair")]] flair : public contract {
 
             uint64_t contestPrize = 0;
             std::list<uint64_t> winners;
-            uint64_t votes;
+            uint64_t votes = 0;
 
             // sum amount of all entry within contest & find winner(s)
             for (auto entryItr = contestEntriesItr; entryItr->contestId == contestItr->id && entryItr != entriesByContest.end(); entryItr++) {
@@ -715,8 +715,10 @@ class [[eosio::contract("flair")]] flair : public contract {
             
             level_index levels(_self, _self.value);
             auto levelItr = levels.find(contestItr->levelId.value);
+            print("level fee: ", levelItr->fee, "\n");
             uint64_t feeAmount = (contestPrize * 10) / levelItr->fee;
             uint64_t prizeRemainder = contestPrize;
+            print("num winners: ", winners.size(), ", winTotal: ", contestPrize - feeAmount, "\n");
             uint64_t winnerPrize = (contestPrize - feeAmount) / winners.size();
 
             for (auto winner = winners.begin(); winner != winners.end(); ++winner){
@@ -731,6 +733,8 @@ class [[eosio::contract("flair")]] flair : public contract {
                int64_t a = static_cast<int64_t>(winnerPrize);
                symbol s = symbol{get_option(name{'currency'}), 4};
                asset amt = asset{a, s};
+               
+               print("sending to winner: ", profileItr->account, ", amt: ", amt, ", memo: ", contestItr->id, "\n");
 
                action{
                   permission_level{get_self(), name("active")},
