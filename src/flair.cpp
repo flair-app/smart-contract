@@ -774,10 +774,15 @@ class [[eosio::contract("flair")]] flair : public contract {
       void checkUnavailablePriceEntries() {
          entries_index entries(_self, _self.value);
          auto entriesByNoPrice = entries.get_index<name("bynoprice")>();
-         auto noPriceEntriesItr = entriesByNoPrice.lower_bound(1);
+         auto noPriceEntriesItr = entriesByNoPrice.lower_bound(true);
 
-         for (auto entryItr = noPriceEntriesItr; entryItr != entriesByNoPrice.end(); ++entryItr){
-            activateEntry<decltype(entriesByNoPrice), decltype(entryItr)>(entriesByNoPrice, entryItr);
+         int limitIndex = 0;
+         auto entryItr = noPriceEntriesItr;
+         while(entryItr != entriesByNoPrice.end() && limitIndex < 500) {
+            auto thisEntryItr = entryItr; // prevent activate entry from resorting after modification
+            limitIndex++;
+            ++entryItr;
+            activateEntry<decltype(entriesByNoPrice), decltype(thisEntryItr)>(entriesByNoPrice, thisEntryItr);
          }
       }
 
@@ -849,7 +854,7 @@ class [[eosio::contract("flair")]] flair : public contract {
       }
 
       template <typename entriesT, typename entryItrT>
-      bool activateEntry(entriesT& entries, entryItrT& entryItr) {
+      bool activateEntry(entriesT& entries, entryItrT& entryItr) {         
          if(entryItr == entries.end()) {
             print("Cannot activate entry: invalid entry");
             return false;
@@ -868,6 +873,9 @@ class [[eosio::contract("flair")]] flair : public contract {
 
          if (now > entryItr->createdAt + entryexpTime) {
             print("Entry is expired, please initiate refund to recieve money back.\n");
+            entries.modify(entryItr, _self, [&](contestEntry& row) {
+               row.priceUnavailable = false;
+            });
             return false;
          }
 
@@ -943,7 +951,7 @@ class [[eosio::contract("flair")]] flair : public contract {
          if (curContestValid) {
             entries.modify(entryItr, _self, [&](contestEntry& row) {
                row.contestId = curContestItr->id;
-               row.priceUnavailable = 0;
+               row.priceUnavailable = false;
             });
             byLevelIdx.modify(curContestItr, _self, [&](contest& row) {
                row.participantCount++;
@@ -975,7 +983,7 @@ class [[eosio::contract("flair")]] flair : public contract {
 
             entries.modify(entryItr, _self, [&](contestEntry& row) {
                row.contestId = newContestId;
-               row.priceUnavailable = 0;
+               row.priceUnavailable = false;
             });
 
             print(entryItr->id, " activated with contest id of ", newContestId, "\n");
