@@ -254,8 +254,6 @@ class ContestActionsUnitTest(unittest.TestCase):
     
     def test_enter_contest_saves_fields_into_table(self):
         id = "contestentry"
-        videoHash360p = "150fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
-        videoHash480p = "250fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
         videoHash720p = "350fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
         videoHash1080p = "450fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
         coverHash = "550fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
@@ -266,8 +264,6 @@ class ContestActionsUnitTest(unittest.TestCase):
                 "id":id,
                 "userId": self.userId,
                 "levelId": self.levelId,
-                "videoHash360p": videoHash360p,
-                "videoHash480p": videoHash480p,
                 "videoHash720p": videoHash720p,
                 "videoHash1080p": videoHash1080p,
                 "coverHash": coverHash,
@@ -287,8 +283,6 @@ class ContestActionsUnitTest(unittest.TestCase):
             "levelId": self.levelId,
             "contestId": 0,
             "amount": 0,
-            "videoHash360p": videoHash360p,
-            "videoHash480p": videoHash480p,
             "videoHash720p": videoHash720p,
             "videoHash1080p": videoHash1080p,
             "coverHash": coverHash,
@@ -320,11 +314,29 @@ class ContestActionsUnitTest(unittest.TestCase):
                 }],
                 permission=(BOB, Permission.ACTIVE)
             )
+    
+    def test_enter_contest_requires_user_to_be_active(self):
+        with self.assertRaises(Error):
+            id = "contestentry2"
+            videoHash720p = "350fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+            videoHash1080p = "450fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+            coverHash = "550fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+
+            HOST.push_action(
+                "entercontest",
+                [{
+                    "userId": self.userId5,
+                    "id":id,
+                    "levelId": self.levelId,
+                    "videoHash720p": videoHash720p,
+                    "videoHash1080p": videoHash1080p,
+                    "coverHash": coverHash,
+                }],
+                permission=(ELLIOT, Permission.ACTIVE)
+            )
 
     def test_enter_contest_overwrites_current_pending_entry_with_new(self):
         id = "contestentry4"
-        videoHash360p = "150fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
-        videoHash480p = "250fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
         videoHash720p = "350fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
         videoHash1080p = "450fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
         coverHash = "550fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
@@ -335,8 +347,6 @@ class ContestActionsUnitTest(unittest.TestCase):
                 "id":id,
                 "userId": self.userId,
                 "levelId": self.levelId,
-                "videoHash360p": videoHash360p,
-                "videoHash480p": videoHash480p,
                 "videoHash720p": videoHash720p,
                 "videoHash1080p": videoHash1080p,
                 "coverHash": coverHash,
@@ -345,8 +355,6 @@ class ContestActionsUnitTest(unittest.TestCase):
         )
 
         id = "contestentry5"
-        videoHash360p = "151fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
-        videoHash480p = "251fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
         videoHash720p = "351fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
         videoHash1080p = "451fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
         coverHash = "551fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
@@ -357,8 +365,6 @@ class ContestActionsUnitTest(unittest.TestCase):
                 "id":id,
                 "userId": self.userId,
                 "levelId": self.levelId,
-                "videoHash360p": videoHash360p,
-                "videoHash480p": videoHash480p,
                 "videoHash720p": videoHash720p,
                 "videoHash1080p": videoHash1080p,
                 "coverHash": coverHash,
@@ -378,8 +384,6 @@ class ContestActionsUnitTest(unittest.TestCase):
             "levelId": self.levelId,
             "contestId": 0,
             "amount": 0,
-            "videoHash360p": videoHash360p,
-            "videoHash480p": videoHash480p,
             "videoHash720p": videoHash720p,
             "videoHash1080p": videoHash1080p,
             "coverHash": coverHash,

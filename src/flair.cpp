@@ -299,7 +299,7 @@ class [[eosio::contract("flair")]] flair : public contract {
          auto userProfile = profiles.find(params.userId.value);
 
          require_auth( userProfile->account );
-
+         check(userProfile->active, "Profile must be active to enter a contest");
          entries_index entries(_self, _self.value);
 
          auto byUserIdAndLevelIdIdx = entries.get_index<name("byuserandlvl")>();         
