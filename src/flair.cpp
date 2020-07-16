@@ -321,7 +321,9 @@ class [[eosio::contract("flair")]] flair : public contract {
                });
             }
          } else if(itr != byUserIdAndLevelIdIdx.end()) {
-            byUserIdAndLevelIdIdx.erase(itr);
+            byUserIdAndLevelIdIdx.modify(itr, _self, [&](contestEntry& row) {
+               row.open = false;
+            });
          }
 
          entries.emplace(_self, [&]( contestEntry& row ) {
@@ -897,6 +899,12 @@ class [[eosio::contract("flair")]] flair : public contract {
       bool activateEntry(entriesT& entries, entryItrT& entryItr) {         
          if(entryItr == entries.end()) {
             print("Cannot activate entry: invalid entry");
+            return false;
+         }
+
+         // ensure entry is already assigned to contest
+         if(!entryItr->open) {
+            print("Cannot activate entry: entry is closed.\n");
             return false;
          }
 
