@@ -219,6 +219,13 @@ class UpdateActionsUnitTest(unittest.TestCase):
         )
 
         HOST.push_action(
+            "setentryarch",
+            [50],
+            permission=(HOST, Permission.ACTIVE),
+            force_unique=1
+        )
+
+        HOST.push_action(
             "setpricefrsh",
             [2],
             permission=(HOST, Permission.ACTIVE),
@@ -501,6 +508,46 @@ class UpdateActionsUnitTest(unittest.TestCase):
         # go ahead payout now to prevent from having side effects on later tests. 
         time.sleep(5)
         HOST.push_action("update", force_unique=True, permission=(HOST, Permission.ACTIVE))
+
+    def test_update_action_archives_entries(self):
+        HOST.push_action(
+            "setentryarch",
+            [5],
+            permission=(HOST, Permission.ACTIVE),
+            force_unique=1
+        )
+
+        TOKENHOST.push_action(
+            "transfer",
+            {
+                "from": self.ALICE,
+                "to": HOST,
+                "quantity": "2.0000 EOS", 
+                "memo": self.entryId,
+            },
+            force_unique=True,
+            permission=(self.ALICE, Permission.ACTIVE)
+        )
+
+        TOKENHOST.push_action(
+            "transfer",
+            {
+                "from": self.BOB,
+                "to": HOST,
+                "quantity": "2.0000 EOS", 
+                "memo": self.entryId2,
+            },
+            force_unique=True,
+            permission=(self.BOB, Permission.ACTIVE)
+        )
+
+        time.sleep(5)
+
+        HOST.push_action("update", force_unique=True, permission=(HOST, Permission.ACTIVE)) 
+
+        entriesRes = HOST.table("entries", HOST, lower=self.entryId, key_type="name")
+        print(entriesRes)
+        self.assertEqual(len(entriesRes.json["rows"]), 0)
 
     @classmethod
     def tearDownClass(cls):
