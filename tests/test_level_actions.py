@@ -52,6 +52,7 @@ class LevelActionsUnitTest(unittest.TestCase):
                 "submissionPeriod": 12,
                 "votePeriod": 12,
                 "fee": 15, # = 1.5%
+                "prizes": [70, 20, 10],
             }], 
             permission=(HOST, Permission.ACTIVE)
         )
@@ -69,6 +70,7 @@ class LevelActionsUnitTest(unittest.TestCase):
             "votePeriod": 12,
             "archived": False,
             "fee": 15, # = 1.5%
+            "prizes": [70, 20, 10],
         }])
             
     def test_create_level_requires_auth_of_self(self):
@@ -84,6 +86,7 @@ class LevelActionsUnitTest(unittest.TestCase):
                     "submissionPeriod": 12,
                     "votePeriod": 12,
                     "fee": 15, # = 1.5%
+                    "prizes": [70, 20, 10],
                 }], 
                 permission=(ALICE, Permission.ACTIVE)
             )
@@ -101,6 +104,7 @@ class LevelActionsUnitTest(unittest.TestCase):
                     "submissionPeriod": 12,
                     "votePeriod": 12,
                     "fee": 15, # = 1.5%
+                    "prizes": [70, 20, 10],
                 }], 
                 permission=(HOST, Permission.ACTIVE)
             )
@@ -117,6 +121,7 @@ class LevelActionsUnitTest(unittest.TestCase):
                 "submissionPeriod": 12,
                 "votePeriod": 12,
                 "fee": 15, # = 1.5%
+                "prizes": [70, 20, 10],
             }], 
             permission=(HOST, Permission.ACTIVE),
             force_unique=1
@@ -134,6 +139,7 @@ class LevelActionsUnitTest(unittest.TestCase):
                     "submissionPeriod": 12,
                     "votePeriod": 12,
                     "fee": 15, # = 1.5%
+                    "prizes": [70, 20, 10],
                 }, 
                 permission=(HOST, Permission.ACTIVE),
                 force_unique=1
@@ -151,6 +157,7 @@ class LevelActionsUnitTest(unittest.TestCase):
                 "submissionPeriod": 12,
                 "votePeriod": 12,
                 "fee": 15, # = 1.5%
+                "prizes": [70, 20, 10],
             }],
             permission=(HOST, Permission.ACTIVE),
             force_unique=1
@@ -168,6 +175,7 @@ class LevelActionsUnitTest(unittest.TestCase):
                     "submissionPeriod": 13,
                     "votePeriod": 13,
                     "fee": 15, # = 1.5%
+                    "prizes": [70, 30],
                 },
             },
             permission=(HOST, Permission.ACTIVE),
@@ -187,6 +195,7 @@ class LevelActionsUnitTest(unittest.TestCase):
             "submissionPeriod": 13,
             "votePeriod": 13,
             "fee": 15, # = 1.5%
+            "prizes": [70, 30],
         }])
 
     def test_edit_level_requires_auth_self(self):
@@ -203,6 +212,7 @@ class LevelActionsUnitTest(unittest.TestCase):
                         "submissionPeriod": 13,
                         "votePeriod": 13,
                         "fee": 15, # = 1.5%
+                        "prizes": [70, 20, 10],
                     },
                 },
                 permission=(ALICE, Permission.ACTIVE),

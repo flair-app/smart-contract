@@ -128,6 +128,15 @@ class UpdateActionsUnitTest(unittest.TestCase):
             force_unique=True,
             permission=(MASTER, Permission.ACTIVE)
         )
+
+        TOKENHOST.push_action(
+            "issue",
+            {
+                "to": self.CAROL, "quantity": "100.0000 EOS", "memo": ""
+            },
+            force_unique=True,
+            permission=(MASTER, Permission.ACTIVE)
+        )
         
         self.userId = self.randomEOSIOId()
 
@@ -139,6 +148,8 @@ class UpdateActionsUnitTest(unittest.TestCase):
                 "imgHash":"950fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9",
                 "account": self.ALICE,
                 "active": True,
+                "link": "",
+                "bio": "",
             }],
             permission=(HOST, Permission.ACTIVE)
         )
@@ -153,6 +164,8 @@ class UpdateActionsUnitTest(unittest.TestCase):
                 "imgHash":"950fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9",
                 "account": self.BOB,
                 "active": True,
+                "link": "",
+                "bio": "",
             }],
             permission=(HOST, Permission.ACTIVE)
         )
@@ -167,6 +180,8 @@ class UpdateActionsUnitTest(unittest.TestCase):
                 "imgHash":"950fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9",
                 "account": self.CAROL,
                 "active": True,
+                "link": "",
+                "bio": "",
             }],
             permission=(HOST, Permission.ACTIVE)
         )
@@ -181,6 +196,8 @@ class UpdateActionsUnitTest(unittest.TestCase):
                 "imgHash":"950fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9",
                 "account": self.ELLIOT,
                 "active": True,
+                "link": "",
+                "bio": "",
             }],
             permission=(HOST, Permission.ACTIVE)
         )
@@ -203,10 +220,11 @@ class UpdateActionsUnitTest(unittest.TestCase):
                 "name":"Gold",
                 "categoryId": "music",
                 "price": 1000,
-                "participantLimit": 2,
-                "submissionPeriod": 2,
-                "votePeriod": 2,
+                "participantLimit": 4,
+                "submissionPeriod": 4,
+                "votePeriod": 4,
                 "fee": 100, # = 10%
+                "prizes": [70, 30],
             }], 
             permission=(HOST, Permission.ACTIVE)
         )
@@ -281,6 +299,22 @@ class UpdateActionsUnitTest(unittest.TestCase):
             permission=(self.BOB, Permission.ACTIVE)
         )
 
+        self.entryId3 = self.randomEOSIOId()
+        HOST.push_action(
+            "entercontest",
+            [{
+                "id": self.entryId3,
+                "userId": self.userId3,
+                "levelId": self.levelId,
+                "videoHash360p": self.videoHash360p,
+                "videoHash480p": self.videoHash480p,
+                "videoHash720p": self.videoHash720p,
+                "videoHash1080p": self.videoHash1080p,
+                "coverHash": self.coverHash,
+            }],
+            permission=(self.CAROL, Permission.ACTIVE)
+        )
+
     def test_update_action_sends_winnings_to_winner_and_flair_only_once(self):
         SCENARIO("test_update_action_sends_winnings_to_winner_and_flair_only_once")
         TOKENHOST.push_action(
@@ -307,7 +341,37 @@ class UpdateActionsUnitTest(unittest.TestCase):
             permission=(self.BOB, Permission.ACTIVE)
         )
 
-        time.sleep(3)    
+        TOKENHOST.push_action(
+            "transfer",
+            {
+                "from": self.CAROL,
+                "to": HOST,
+                "quantity": "2.0000 EOS", 
+                "memo": self.entryId3,
+            },
+            force_unique=True,
+            permission=(self.CAROL, Permission.ACTIVE)
+        )
+
+        time.sleep(5)    
+
+        HOST.push_action(
+            "vote",
+            {
+                "entryId": self.entryId,
+                "voterUserId": self.userId,
+            },
+            permission=(self.ALICE, Permission.ACTIVE)
+        )
+
+        HOST.push_action(
+            "vote",
+            {
+                "entryId": self.entryId2,
+                "voterUserId": self.userId2,
+            },
+            permission=(self.BOB, Permission.ACTIVE)
+        )
 
         HOST.push_action(
             "vote",
@@ -318,10 +382,12 @@ class UpdateActionsUnitTest(unittest.TestCase):
             permission=(self.CAROL, Permission.ACTIVE)
         )
 
-        time.sleep(2)
+        time.sleep(4)
         
         feeBeforeBal = float(self.getEOSBalance(self.FEEACCT))
+        aliceBeforeBal = float(self.getEOSBalance(self.ALICE))
         bobBeforeBal = float(self.getEOSBalance(self.BOB))
+
 
         HOST.table("contests", HOST)
 
@@ -329,10 +395,13 @@ class UpdateActionsUnitTest(unittest.TestCase):
         HOST.push_action("update", force_unique=True, permission=(HOST, Permission.ACTIVE))
 
         feeAfterBal = float(self.getEOSBalance(self.FEEACCT))
+        aliceAfterBal = float(self.getEOSBalance(self.ALICE))
         bobAfterBal = float(self.getEOSBalance(self.BOB))
+
         
-        self.assertAlmostEqual(feeAfterBal - feeBeforeBal, 0.4)
-        self.assertAlmostEqual(bobAfterBal - bobBeforeBal, 3.6)
+        self.assertAlmostEqual(feeAfterBal - feeBeforeBal, 0.6)
+        self.assertAlmostEqual(aliceAfterBal - aliceBeforeBal, 1.62)
+        self.assertAlmostEqual(bobAfterBal - bobBeforeBal, 3.78)
 
     def test_update_action_sends_winnings_to_winners_when_tied_and_flair_only_once(self):
         SCENARIO("test_update_action_sends_winnings_to_winners_when_tied_and_flair_only_once")
@@ -360,7 +429,7 @@ class UpdateActionsUnitTest(unittest.TestCase):
             permission=(self.BOB, Permission.ACTIVE)
         )
 
-        time.sleep(3)    
+        time.sleep(5)    
 
         HOST.push_action(
             "vote",
@@ -380,7 +449,7 @@ class UpdateActionsUnitTest(unittest.TestCase):
             permission=(self.ELLIOT, Permission.ACTIVE)
         )
 
-        time.sleep(2)
+        time.sleep(4)
         
         feeBeforeBal = float(self.getEOSBalance(self.FEEACCT))
         bobBeforeBal = float(self.getEOSBalance(self.BOB))
@@ -425,7 +494,7 @@ class UpdateActionsUnitTest(unittest.TestCase):
             permission=(self.BOB, Permission.ACTIVE)
         )
 
-        time.sleep(3)    
+        time.sleep(5)    
 
         HOST.push_action(
             "vote",
@@ -451,7 +520,7 @@ class UpdateActionsUnitTest(unittest.TestCase):
         self.assertAlmostEqual(bobAfterBal, bobBeforeBal)
 
         # go ahead payout now to prevent from having side effects on later tests. 
-        time.sleep(3)
+        time.sleep(5)
         HOST.push_action("update", force_unique=True, permission=(HOST, Permission.ACTIVE))
 
     def test_update_action_activates_priceUnavailable_entries_that_have_prices(self):
@@ -470,7 +539,7 @@ class UpdateActionsUnitTest(unittest.TestCase):
             force_unique=1
         )
 
-        time.sleep(3)
+        time.sleep(5)
 
         TOKENHOST.push_action(
             "transfer",

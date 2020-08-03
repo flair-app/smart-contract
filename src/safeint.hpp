@@ -30,6 +30,24 @@ struct safeint {
         eosio::check( is_amount_within_range(), "magnitude of safeint amount must be less than 2^62" );
     }
 
+    safeint(uint64_t a)
+    {
+        eosio::check( a <= max_amount, "magnitude of safeint amount must be less than 2^62" );
+        amount = (int64_t) a;
+    }
+
+    safeint(uint32_t a)
+    {
+        eosio::check( a <= max_amount, "magnitude of safeint amount must be less than 2^62" );
+        amount = (int64_t) a;
+    }
+
+    safeint( int a)
+    :amount(a)
+    {
+        eosio::check( is_amount_within_range(), "magnitude of safeint amount must be less than 2^62" );
+    }
+
     /**
      * Check if the amount doesn't exceed the max amount
      *

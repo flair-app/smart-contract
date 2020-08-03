@@ -67,6 +67,7 @@ class [[eosio::contract("flair")]] flair : public contract {
          uint32_t submissionPeriod;
          uint32_t votePeriod;
          uint32_t fee;
+         std::list<uint32_t> prizes;
       };
 
       [[eosio::action]]
@@ -85,6 +86,7 @@ class [[eosio::contract("flair")]] flair : public contract {
             row.votePeriod = params.votePeriod;
             row.archived = false;
             row.fee = params.fee;
+            row.prizes = params.prizes;
          });
       }
 
@@ -99,6 +101,7 @@ class [[eosio::contract("flair")]] flair : public contract {
          uint32_t submissionPeriod;
          uint32_t votePeriod;
          uint32_t fee;
+         std::list<uint32_t> prizes;
       };
 
       [[eosio::action]]
@@ -117,6 +120,7 @@ class [[eosio::contract("flair")]] flair : public contract {
             row.submissionPeriod = data.submissionPeriod;
             row.votePeriod = data.votePeriod;
             row.fee = data.fee;
+            row.prizes = data.prizes;
          });
       }
 
@@ -128,6 +132,8 @@ class [[eosio::contract("flair")]] flair : public contract {
          std::string username;
          checksum256 imgHash;
          name account;
+         std::string link;
+         std::string bio;
          bool active;
       };
 
@@ -136,16 +142,12 @@ class [[eosio::contract("flair")]] flair : public contract {
          require_auth( _self );
 
          check(checkusername(params.username), "Invalid Username");
+         checkUsernameExists(params.username);
+         checkAndSanitizeLink(params.link);
+         checkAndSanitizeBio(params.bio);
 
          profile_index profiles( _self, _self.value );
-         
-         checksum256 usernameHash = sha256(&params.username[0], params.username.size());
-
-         auto byUsernameHashIdx = profiles.get_index<name("byusername")>();
-         auto itr = byUsernameHashIdx.find(usernameHash);
-
-         check(itr->username != params.username, "Username already exists.");
-
+         checksum256 usernameHash = hashUsername(params.username);
          profiles.emplace(_self, [&](profile& row) {
             row.id = params.id;
             row.username = params.username;
@@ -153,6 +155,8 @@ class [[eosio::contract("flair")]] flair : public contract {
             row.imgHash = params.imgHash;
             row.account = params.account;
             row.active = params.active;
+            row.link = params.link;
+            row.bio = params.bio;
          });
       }
 
@@ -162,6 +166,8 @@ class [[eosio::contract("flair")]] flair : public contract {
       struct editprofargsu {
          std::string username;
          checksum256 imgHash;
+         std::string link;
+         std::string bio;
       };
 
       [[eosio::action]]
@@ -171,19 +177,20 @@ class [[eosio::contract("flair")]] flair : public contract {
 
          require_auth( userProfile->account );
 
-         checksum256 usernameHash = sha256(&data.username[0], data.username.size());
-
          if (userProfile->username != data.username) {
-            auto byUsernameHashIdx = profiles.get_index<name("byusername")>();
-            auto existingUsernameProfile = byUsernameHashIdx.find(usernameHash);
-            check(existingUsernameProfile->username != data.username, "Username already exists.");
+            checkUsernameExists(data.username);
          }
+         checkAndSanitizeLink(data.link);
+         checkAndSanitizeBio(data.bio);
 
+         checksum256 usernameHash = hashUsername(data.username);
          profiles.modify(userProfile, _self, [&](profile& row) {
             row.id = id;
             row.username = data.username;
             row.usernameHash = usernameHash;
             row.imgHash = data.imgHash;
+            row.link = data.link;
+            row.bio = data.bio;
          });
       }
 
@@ -194,6 +201,8 @@ class [[eosio::contract("flair")]] flair : public contract {
          std::string username;
          checksum256 imgHash;
          name account;
+         std::string link;
+         std::string bio;
          bool active;
       };
 
@@ -203,13 +212,14 @@ class [[eosio::contract("flair")]] flair : public contract {
 
          profile_index profiles(_self, _self.value);
          auto userProfile = profiles.find(id.value);
-         checksum256 usernameHash = sha256(&data.username[0], data.username.size());
+         checksum256 usernameHash = hashUsername(data.username);
 
          if (userProfile->username != data.username) {
-            auto byUsernameHashIdx = profiles.get_index<name("byusername")>();
-            auto existingUsernameProfile = byUsernameHashIdx.find(usernameHash);
-            check(existingUsernameProfile->username != data.username, "Username already exists.");
+            checkUsernameExists(data.username);
          }
+
+         checkAndSanitizeLink(data.link);
+         checkAndSanitizeBio(data.bio);
 
          profiles.modify(userProfile, _self, [&](profile& row) {
             row.id = id;
@@ -218,6 +228,8 @@ class [[eosio::contract("flair")]] flair : public contract {
             row.imgHash = data.imgHash;
             row.account = data.account;
             row.active = data.active;
+            row.link = data.link;
+            row.bio = data.bio;
          });
       }
 
@@ -536,6 +548,7 @@ class [[eosio::contract("flair")]] flair : public contract {
          uint32_t submissionPeriod;
          uint32_t votePeriod;
          uint32_t fee;
+         std::list<uint32_t> prizes;
 
          uint64_t primary_key() const { return id.value; }
       };
@@ -550,6 +563,8 @@ class [[eosio::contract("flair")]] flair : public contract {
          std::string username;
          checksum256 usernameHash;
          checksum256 imgHash;
+         std::string link;
+         std::string bio;
          name account;
          bool active;
 
@@ -706,7 +721,7 @@ class [[eosio::contract("flair")]] flair : public contract {
          } else {
             contestItrEndTime--;
          }
-         
+
          auto contestItr = contestItrEndTime;
          bool hitBeginning = false;
          while(!hitBeginning && contestItr->paid == false) {
@@ -714,65 +729,104 @@ class [[eosio::contract("flair")]] flair : public contract {
             entries_index entries(_self, _self.value);
             auto entriesByContest = entries.get_index<name("bycontest")>();
             auto contestEntriesItr = entriesByContest.lower_bound(contestItr->id);
+            level_index levels(_self, _self.value);
+            auto levelItr = levels.find(contestItr->levelId.value);
 
             symbol s(get_option(name{'currency'}), 4);
             asset contestPrize(0, s);
-            std::list<uint64_t> winners;
+            std::map<uint64_t, std::list<uint64_t>> winners;
             uint64_t votes = 0;
 
             // sum amount of all entry within contest & find winner(s)
             for (auto entryItr = contestEntriesItr; entryItr->contestId == contestItr->id && entryItr != entriesByContest.end(); entryItr++) {
+               print("user: ", entryItr->userId, " votes: ", entryItr->votes, " amount: ", entryItr->amount, "\n");
                contestPrize += asset(entryItr->amount, s);
-               if (entryItr->votes > votes) {
-                  votes = entryItr->votes;
-                  winners.clear();
-                  winners.push_back(entryItr->userId.value);
-               } else if(entryItr->votes == votes) {
-                  winners.push_back(entryItr->userId.value);
+               std::list<uint64_t> winnersByVotes; 
+               if(winners.find(entryItr->votes) != winners.end()) {
+                  winnersByVotes = winners[entryItr->votes];
+                  winnersByVotes.push_back(entryItr->userId.value);
+               } else {
+                  winnersByVotes = {entryItr->userId.value};
                }
+               winners[entryItr->votes] = winnersByVotes;
             }
-            
-            level_index levels(_self, _self.value);
-            auto levelItr = levels.find(contestItr->levelId.value);
+
             print("level fee: ", levelItr->fee, "\n");
             check(levelItr->fee < 1000, "interval error: fee is too large, must be below 100%");
             asset feeAmount = (contestPrize * 10) / levelItr->fee;
+            asset winTotal = contestPrize - feeAmount;
             asset prizeRemainder = contestPrize;
-            print("num winners: ", winners.size(), ", winTotal: ", contestPrize - feeAmount, ", fee: ", feeAmount, "\n");
-            asset winnerPrize = (contestPrize - feeAmount) / winners.size();
 
-            for (auto winner = winners.begin(); winner != winners.end(); ++winner) {
-               prizeRemainder -= winnerPrize;
+            safeint totalWinnersWeight(0);
 
-               profile_index profiles(_self, _self.value);
-               auto profileItr = profiles.find(*winner);
-               if (profileItr == profiles.end()) {
-                  continue;
+            auto rank = 1;
+            auto prize = levelItr->prizes.begin();
+            for(auto rankWinners = winners.rbegin(); rankWinners != winners.rend(); ++rankWinners) {
+               if (rank > levelItr->prizes.size()) {
+                  break;
                }
 
-               print("sending to winner: ", profileItr->account, ", amt: ", winnerPrize, ", memo: ", contestItr->id, "\n");
+               for (auto const& winner : rankWinners->second) {
+                  totalWinnersWeight = totalWinnersWeight + safeint{*prize};
+               }
 
-               action{
-                  permission_level{get_self(), name("active")},
-                  name("eosio.token"),
-                  name("transfer"),
-                  std::make_tuple(get_self(), profileItr->account, winnerPrize, std::to_string(contestItr->id))
-               }.send();
+               ++rank;
+               ++prize;
             }
 
-            name feeacct(get_option(name{"feeacct"}));
-            std::string feeacctmemo = get_option(name{"feeacctmemo"});
-            print("feeacct: ", feeacct, ", memo: ", feeacctmemo, ", amount: ", prizeRemainder, "\n");
-            action{
-               permission_level{get_self(), name("active")},
-               name("eosio.token"),
-               name("transfer"),
-               std::make_tuple(get_self(), feeacct, prizeRemainder, feeacctmemo)
-            }.send();
+            print("totalWinnersWeight: ", totalWinnersWeight.amount, ", winTotal: ", winTotal, ", fee: ", feeAmount, "\n");
 
-            contestsByEndtime.modify(contestItr, _self, [&](contest& row) {
-               row.paid = true;
-            });
+            if (winTotal.amount > 0 && totalWinnersWeight > 0) {
+               rank = 1;
+               prize = levelItr->prizes.begin();
+               for(auto rankWinners = winners.rbegin(); rankWinners != winners.rend(); ++rankWinners) {
+                  if (rank > levelItr->prizes.size()) {
+                     break;
+                  }
+
+                  for (auto const& winner : rankWinners->second) {
+                     safeint total = safeint{winTotal.amount} * safeint{*prize} / safeint{totalWinnersWeight};
+                     asset winnerPrize(total.amount, s);
+                     prizeRemainder -= winnerPrize;
+
+                     profile_index profiles(_self, _self.value);
+                     auto profileItr = profiles.find(winner);
+                     if (profileItr == profiles.end()) {
+                        continue;
+                     }
+
+                     print("sending to winner: ", profileItr->account, ", amt: ", winnerPrize, ", memo: ", contestItr->id, "\n");
+
+                     if (winnerPrize.amount > 0) { 
+                        action{
+                           permission_level{get_self(), name("active")},
+                           name("eosio.token"),
+                           name("transfer"),
+                           std::make_tuple(get_self(), profileItr->account, winnerPrize, std::to_string(contestItr->id))
+                        }.send();
+                     }
+                  }
+
+                  ++rank;
+                  ++prize;
+               }
+
+               name feeacct(get_option(name{"feeacct"}));
+               std::string feeacctmemo = get_option(name{"feeacctmemo"});
+               print("feeacct: ", feeacct, ", memo: ", feeacctmemo, ", amount: ", prizeRemainder, "\n");
+               if (prizeRemainder.amount > 0) {
+                  action{
+                     permission_level{get_self(), name("active")},
+                     name("eosio.token"),
+                     name("transfer"),
+                     std::make_tuple(get_self(), feeacct, prizeRemainder, feeacctmemo)
+                  }.send();
+               }
+
+               contestsByEndtime.modify(contestItr, _self, [&](contest& row) {
+                  row.paid = true;
+               });
+            }
 
             hitBeginning = contestItr == contestsByEndtime.begin();
             if (!hitBeginning) {
@@ -1082,5 +1136,90 @@ class [[eosio::contract("flair")]] flair : public contract {
       uint64_t get_option_int(name id) {
          std::string str = get_option(id);
          return std::stoi(str);
+      }
+
+      void htmlspecialchars(std::string& data) {
+         std::string buffer;
+         buffer.reserve(data.size());
+         for(size_t pos = 0; pos != data.size(); ++pos) {
+            switch(data[pos]) {
+                  case '&':  buffer.append("&amp;");       break;
+                  case '\"': buffer.append("&quot;");      break;
+                  case '\'': buffer.append("&apos;");      break;
+                  case '<':  buffer.append("&lt;");        break;
+                  case '>':  buffer.append("&gt;");        break;
+                  default:   buffer.append(&data[pos], 1); break;
+            }
+         }
+         data.swap(buffer);
+      }
+
+      void checkAndSanitizeLink(std::string& data) {
+         if (data.length() == 0) { 
+            return; 
+         }
+
+         bool isHttp = data.rfind("http:", 0) >= 0 || data.rfind("https:", 0) >= 0;
+         check(isHttp, "Link must start with http or https");
+         check(data.length() <= 2000, 'Link is too long, must be 2000 characters or less');
+         htmlspecialchars(data);
+      }
+
+      void checkAndSanitizeBio(std::string& data) {
+         check(data.length() <= 150, 'Bio is too long, must be 150 characters or less');
+         htmlspecialchars(data);
+      }
+
+      char tolower(char c) {
+         std::map<char, char> lowercaseMap({
+            {'A', 'a'}, {'B', 'b'}, {'C', 'c'}, {'D', 'd'}, {'E', 'e'}, {'F', 'f'},
+            {'G', 'g'}, {'H', 'h'}, {'I', 'i'}, {'J', 'j'}, {'K', 'k'}, {'L', 'l'}, {'M', 'm'}, {'N', 'n'},
+            {'O', 'o'}, {'P', 'p'}, {'Q', 'q'}, {'R', 'r'}, {'S', 's'}, {'T', 't'}, {'U', 'u'}, {'V', 'v'},
+            {'W', 'w'}, {'X', 'x'}, {'Y', 'y'}, {'Z', 'z'},
+         });
+
+         auto it = lowercaseMap.find(c);
+         if(it == lowercaseMap.end()) {
+            return c;
+         }
+
+         return it->second;
+      }
+
+      checksum256 hashUsername(std::string username) {
+         std::transform(username.begin(), username.end(), username.begin(),
+            [&](unsigned char c){ return tolower(c); });
+         print("lowercase", username, "\n");
+         return sha256(&username[0], username.size());
+      }
+
+      void checkUsernameExistsSingle(std::string username) {
+         checksum256 usernameHash = hashUsername(username);
+         profile_index profiles(_self, _self.value);
+         auto byUsernameHashIdx = profiles.get_index<name("byusername")>();
+         auto itr = byUsernameHashIdx.find(usernameHash);
+
+         check(itr->usernameHash != usernameHash, "Username already exists.");
+      }
+
+      void checkUsernameExists(std::string username) {
+         std::map<char, char> lookAlikeChars({
+            {'l', 'I'},
+            {'I', 'l'},
+            {'O', '0'},
+            {'0', 'O'},
+         });
+
+         checkUsernameExistsSingle(username);
+
+         for (std::string::size_type i = 0; i < username.size(); i++) {
+            auto it = lookAlikeChars.find(username[i]);
+            if(it == lookAlikeChars.end()) {
+               continue;
+            }
+            std::string lookAlike = username;
+            lookAlike[i] = it->second;
+            checkUsernameExistsSingle(lookAlike);
+         }
       }
 };

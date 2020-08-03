@@ -223,6 +223,7 @@ class ContestActionsUnitTest(unittest.TestCase):
                 "submissionPeriod": 2,
                 "votePeriod": 2,
                 "fee": 100,
+                "prizes": [100],
             }], 
             permission=(HOST, Permission.ACTIVE)
         )

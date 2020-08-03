@@ -50,6 +50,8 @@ class ProfileActionsUnitTest(unittest.TestCase):
                 "imgHash":imgHash,
                 "account": ALICE,
                 "active": True,
+                "link": "https://google.com",
+                "bio": "I am a test user. <script>alert('xss')</script>",
             }],
             permission=(HOST, Permission.ACTIVE)
         )
@@ -58,7 +60,16 @@ class ProfileActionsUnitTest(unittest.TestCase):
         
         tableRes = HOST.table("profiles", HOST, lower=id, key_type="name", limit=1)
         tableData = json.loads(tableRes.out_msg)
-
+        print(tableData["rows"], [{
+            "id":id,
+            "username":username,
+            "usernameHash":usernameHash.hexdigest(),
+            "imgHash":imgHash,
+            "account": str(ALICE),
+            "active": 1,
+            "link": "https://google.com",
+            "bio": "I am a test user. &lt;script&gt;alert(&apos;xss&apos;)&lt;/script&gt;",
+        }])
         self.assertEqual(tableData["rows"], [{
             "id":id,
             "username":username,
@@ -66,6 +77,8 @@ class ProfileActionsUnitTest(unittest.TestCase):
             "imgHash":imgHash,
             "account": str(ALICE),
             "active": 1,
+            "link": "https://google.com",
+            "bio": "I am a test user. &lt;script&gt;alert(&apos;xss&apos;)&lt;/script&gt;",
         }])
 
     def test_create_profile_requires_auth_of_self(self):
@@ -87,6 +100,8 @@ class ProfileActionsUnitTest(unittest.TestCase):
                     "imgHash":imgHash,
                     "account": ALICE,
                     "active": True,
+                    "link": "https://google.com",
+                    "bio": "I am a test user.",
                 }],
                 permission=(ALICE, Permission.ACTIVE)
             )
@@ -101,10 +116,12 @@ class ProfileActionsUnitTest(unittest.TestCase):
             "addprofile",
             [{
                 "id":"1111111111111",
-                "username":"tester1",
+                "username":"IlikeTOtest",
                 "imgHash":"950fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9",
                 "account":ALICE,
                 "active":True,
+                "link": "https://google.com",
+                "bio": "I am a test user.",
             }],
             permission=(HOST, Permission.ACTIVE)
         )
@@ -114,10 +131,73 @@ class ProfileActionsUnitTest(unittest.TestCase):
                 "addprofile",
                 [{
                     "id":"1111111111112",
-                    "username":"tester1",
+                    "username":"IlikeTOtest",
                     "imgHash":"950fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9",
                     "account":BOB,
                     "active":True,
+                    "link": "https://google.com",
+                    "bio": "I am a test user.",
+                }],
+                permission=(HOST, Permission.ACTIVE)
+            )
+
+
+        with self.assertRaises(Error):
+            HOST.push_action(
+                "addprofile",
+                [{
+                    "id":"1111111111112",
+                    "username":"IIikeTOtest",
+                    "imgHash":"950fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9",
+                    "account":BOB,
+                    "active":True,
+                    "link": "https://google.com",
+                    "bio": "I am a test user.",
+                }],
+                permission=(HOST, Permission.ACTIVE)
+            )
+
+        with self.assertRaises(Error):
+            HOST.push_action(
+                "addprofile",
+                [{
+                    "id":"1111111111112",
+                    "username":"llikeTOtest",
+                    "imgHash":"950fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9",
+                    "account":BOB,
+                    "active":True,
+                    "link": "https://google.com",
+                    "bio": "I am a test user.",
+                }],
+                permission=(HOST, Permission.ACTIVE)
+            )
+        
+        with self.assertRaises(Error):
+            HOST.push_action(
+                "addprofile",
+                [{
+                    "id":"1111111111112",
+                    "username":"IlikeT0test",
+                    "imgHash":"950fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9",
+                    "account":BOB,
+                    "active":True,
+                    "link": "https://google.com",
+                    "bio": "I am a test user.",
+                }],
+                permission=(HOST, Permission.ACTIVE)
+            )
+        
+        with self.assertRaises(Error):
+            HOST.push_action(
+                "addprofile",
+                [{
+                    "id":"1111111111112",
+                    "username":"IlikeTOTest",
+                    "imgHash":"950fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9",
+                    "account":BOB,
+                    "active":True,
+                    "link": "https://google.com",
+                    "bio": "I am a test user.",
                 }],
                 permission=(HOST, Permission.ACTIVE)
             )
@@ -132,7 +212,7 @@ class ProfileActionsUnitTest(unittest.TestCase):
             "tester", #min 6 char
             "t.e.s.t.e.r", # can contain dots
             "1test1", # can contain numbers & start and end with numbers
-            "TeStEr", # can contain capital numbers
+            "TeStEr1", # can contain capital numbers
             "abcdefghijkmnopqrstuvxz1234789", # can contain upto 30 char
         ]
         invalidUsernames = [
@@ -180,6 +260,8 @@ class ProfileActionsUnitTest(unittest.TestCase):
                     "imgHash":"950fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9",
                     "account":accountname,
                     "active":True,
+                    "link": "https://google.com",
+                    "bio": "I am a test user.",
                 }],
                 permission=(HOST, Permission.ACTIVE)
             )
@@ -212,6 +294,8 @@ class ProfileActionsUnitTest(unittest.TestCase):
                         "imgHash":"950fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9",
                         "account":accountname,
                         "active":True,
+                        "link": "https://google.com",
+                        "bio": "I am a test user.",
                     }],
                     permission=(HOST, Permission.ACTIVE)
                 )
@@ -223,7 +307,6 @@ class ProfileActionsUnitTest(unittest.TestCase):
             "tester2",
             "t.e.s.t.e.r2",
             "1test3",
-            "TeStEr2",
             "abcdefghijkmnopqrstuvxz1234781",
         ]
 
@@ -246,6 +329,8 @@ class ProfileActionsUnitTest(unittest.TestCase):
                     "imgHash":"950fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9",
                     "account":accountname,
                     "active":True,
+                    "link": "https://google.com",
+                    "bio": "I am a test user.",
                 }],
                 permission=(HOST, Permission.ACTIVE)
             )
@@ -286,6 +371,8 @@ class ProfileActionsUnitTest(unittest.TestCase):
                 "imgHash":"950fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9",
                 "account": accountname,
                 "active": 1,
+                "link": "https://google.com",
+                "bio": "I am a test user.",
             }])
 
     def test_edit_profile_modifies_table_when_user_auth(self):
@@ -307,6 +394,8 @@ class ProfileActionsUnitTest(unittest.TestCase):
                 "imgHash":imgHash,
                 "account": str(ALICE),
                 "active": True,
+                "link": "https://google.com",
+                "bio": "I am a test user.",
             }],
             permission=(HOST, Permission.ACTIVE)
         )
@@ -318,6 +407,8 @@ class ProfileActionsUnitTest(unittest.TestCase):
                 {
                     "username":usernameEdit,
                     "imgHash":imgHashEdit,
+                    "link": "https://google.com/edited",
+                    "bio": "I am a test user 2.",
                 }
             ],
             permission=(ALICE, Permission.ACTIVE)
@@ -335,6 +426,8 @@ class ProfileActionsUnitTest(unittest.TestCase):
             "imgHash":imgHashEdit,
             "account": str(ALICE),
             "active": 1,
+            "link": "https://google.com/edited",
+            "bio": "I am a test user 2.",
         }])
 
     def test_edit_profile_with_same_username_modifies_table_when_user_auth(self):
@@ -356,6 +449,8 @@ class ProfileActionsUnitTest(unittest.TestCase):
                 "imgHash":imgHash,
                 "account": str(ALICE),
                 "active": True,
+                "link": "https://google.com",
+                "bio": "I am a test user.",
             }],
             permission=(HOST, Permission.ACTIVE)
         )
@@ -367,6 +462,8 @@ class ProfileActionsUnitTest(unittest.TestCase):
                 {
                     "username":usernameEdit,
                     "imgHash":imgHashEdit,
+                    "link": "https://google.com/edit",
+                    "bio": "I am a test edit user.",
                 }
             ],
             permission=(ALICE, Permission.ACTIVE)
@@ -384,6 +481,8 @@ class ProfileActionsUnitTest(unittest.TestCase):
             "imgHash":imgHashEdit,
             "account": str(ALICE),
             "active": 1,
+            "link": "https://google.com/edit",
+            "bio": "I am a test edit user.",
         }])
 
     def test_edit_profile_as_user_requires_auth_user(self):
@@ -396,6 +495,8 @@ class ProfileActionsUnitTest(unittest.TestCase):
                 "imgHash":"950fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9",
                 "account": str(ALICE),
                 "active": True,
+                "link": "https://google.com",
+                "bio": "I am a test user.",
             }],
             permission=(HOST, Permission.ACTIVE)
         )
@@ -408,6 +509,8 @@ class ProfileActionsUnitTest(unittest.TestCase):
                     {
                         "username":"testing444b",
                         "imgHash":"950fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9",
+                        "link": "https://google.com",
+                        "bio": "I am a test user.",
                     }
                 ],
                 force_unique=1,
@@ -424,6 +527,8 @@ class ProfileActionsUnitTest(unittest.TestCase):
                 "imgHash":"950fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9",
                 "account": str(ALICE),
                 "active": True,
+                "link": "https://google.com",
+                "bio": "I am a test user.",
             }],
             permission=(HOST, Permission.ACTIVE)
         )
@@ -437,6 +542,8 @@ class ProfileActionsUnitTest(unittest.TestCase):
                 "imgHash":"950fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9",
                 "account": str(BOB),
                 "active": True,
+                "link": "https://google.com",
+                "bio": "I am a test user.",
             }],
             permission=(HOST, Permission.ACTIVE)
         )
@@ -449,6 +556,8 @@ class ProfileActionsUnitTest(unittest.TestCase):
                     {
                         "username":"testing333b",
                         "imgHash":"950fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9",
+                        "link": "https://google.com",
+                        "bio": "I am a test user.",
                     }
                 ],
                 force_unique=1,
@@ -474,6 +583,8 @@ class ProfileActionsUnitTest(unittest.TestCase):
                 "imgHash":imgHash,
                 "account": str(ALICE),
                 "active": True,
+                "link": "https://google.com",
+                "bio": "I am a test user.",
             }],
             permission=(HOST, Permission.ACTIVE)
         )
@@ -487,6 +598,8 @@ class ProfileActionsUnitTest(unittest.TestCase):
                     "imgHash":imgHashEdit,
                     "account": str(BOB),
                     "active": False,
+                    "link": "https://google.com/edit",
+                    "bio": "I am a test edit user.",
                 }
             ],
             permission=(HOST, Permission.ACTIVE)
@@ -504,6 +617,8 @@ class ProfileActionsUnitTest(unittest.TestCase):
             "imgHash":imgHashEdit,
             "account": str(BOB),
             "active": 0,
+            "link": "https://google.com/edit",
+            "bio": "I am a test edit user.",
         }])
     
     def test_edit_profile_with_same_username_modifies_table_when_admin_auth(self):
@@ -525,6 +640,8 @@ class ProfileActionsUnitTest(unittest.TestCase):
                 "imgHash":imgHash,
                 "account": str(ALICE),
                 "active": True,
+                "link": "https://google.com",
+                "bio": "I am a test user.",
             }],
             permission=(HOST, Permission.ACTIVE)
         )
@@ -538,6 +655,8 @@ class ProfileActionsUnitTest(unittest.TestCase):
                     "imgHash":imgHashEdit,
                     "account": str(BOB),
                     "active": False,
+                    "link": "https://google.com/edit",
+                    "bio": "I am a test edit user.",
                 }
             ],
             permission=(HOST, Permission.ACTIVE)
@@ -555,6 +674,8 @@ class ProfileActionsUnitTest(unittest.TestCase):
             "imgHash":imgHashEdit,
             "account": str(BOB),
             "active": 0,
+            "link": "https://google.com/edit",
+            "bio": "I am a test edit user.",
         }])
 
     def test_edit_profile_as_admin_requires_auth_self(self):
@@ -567,6 +688,8 @@ class ProfileActionsUnitTest(unittest.TestCase):
                 "imgHash":"950fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9",
                 "account": str(ALICE),
                 "active": True,
+                "link": "https://google.com",
+                "bio": "I am a test user.",
             }],
             permission=(HOST, Permission.ACTIVE)
         )
@@ -581,6 +704,8 @@ class ProfileActionsUnitTest(unittest.TestCase):
                         "imgHash":"950fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9",
                         "account": str(BOB),
                         "active": False,
+                        "link": "https://google.com",
+                        "bio": "I am a test user.",
                     }
                 ],
                 force_unique=1,
@@ -597,6 +722,8 @@ class ProfileActionsUnitTest(unittest.TestCase):
                 "imgHash":"950fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9",
                 "account": str(ALICE),
                 "active": True,
+                "link": "https://google.com",
+                "bio": "I am a test user.",
             }],
             permission=(HOST, Permission.ACTIVE)
         )
@@ -610,6 +737,8 @@ class ProfileActionsUnitTest(unittest.TestCase):
                 "imgHash":"950fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9",
                 "account": str(BOB),
                 "active": True,
+                "link": "https://google.com",
+                "bio": "I am a test user.",
             }],
             permission=(HOST, Permission.ACTIVE)
         )
@@ -624,6 +753,8 @@ class ProfileActionsUnitTest(unittest.TestCase):
                         "imgHash":"950fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9",
                         "account": str(ALICE),
                         "active": True,
+                        "link": "https://google.com",
+                        "bio": "I am a test user.",
                     }
                 ],
                 force_unique=1,
