@@ -72,6 +72,7 @@ class [[eosio::contract("flair")]] flair : public contract {
 
       [[eosio::action]]
       void createlevel(createlvlargs params) {
+         check(false, "Under Maintenance");
          require_auth( _self );
 
          level_index levels( _self, _self.value );
@@ -106,6 +107,7 @@ class [[eosio::contract("flair")]] flair : public contract {
 
       [[eosio::action]]
       void editlevel(name id,  editlevelargs data) {
+         check(false, "Under Maintenance");
          require_auth( _self );
 
          level_index levels( _self, _self.value );
@@ -139,6 +141,7 @@ class [[eosio::contract("flair")]] flair : public contract {
 
       [[eosio::action]]
       void addprofile(addprofargs params) {
+         check(false, "Under Maintenance");
          require_auth( _self );
 
          check(checkusername(params.username), "Invalid Username");
@@ -172,6 +175,7 @@ class [[eosio::contract("flair")]] flair : public contract {
 
       [[eosio::action]]
       void editprofuser(name id, editprofargsu data) {
+         check(false, "Under Maintenance");
          profile_index profiles(_self, _self.value);
          auto userProfile = profiles.find(id.value);
 
@@ -208,6 +212,7 @@ class [[eosio::contract("flair")]] flair : public contract {
 
       [[eosio::action]]
       void editprofadm(name id, editprofargsa data) {
+         check(false, "Under Maintenance");
          require_auth(_self);
 
          profile_index profiles(_self, _self.value);
@@ -520,6 +525,43 @@ class [[eosio::contract("flair")]] flair : public contract {
          // noop
       }
 
+      /*
+         Migrate Profile
+      */
+      [[eosio::action]]
+      void migrateprof(uint64_t limit) {
+         require_auth( _self );
+
+         move_table<profiletmp_index, profile_index>(limit, [&](auto itr, profile& row) {
+            row.id = itr->id;
+            row.username = itr->username;
+            row.usernameHash = itr->usernameHash;
+            row.imgHash = itr->imgHash;
+            row.account = itr->account;
+            row.active = itr->active;
+         });
+      }
+
+      /*
+         Migrate Entry
+      */
+      [[eosio::action]]
+      void migratelvl(uint64_t limit) {
+         require_auth( _self );
+
+         move_table<leveltmp_index, level_index>(limit, [&](auto itr, level& row) {
+            row.id = itr->id;
+            row.categoryId = itr->categoryId;
+            row.name = itr->name;
+            row.price = itr->price;
+            row.participantLimit = itr->participantLimit;
+            row.submissionPeriod = itr->submissionPeriod;
+            row.votePeriod = itr->votePeriod;
+            row.archived = itr->archived;
+            row.fee = itr->fee;
+         });
+      }
+
    private:
       /*
          TABLE: categories
@@ -555,6 +597,23 @@ class [[eosio::contract("flair")]] flair : public contract {
 
       typedef eosio::multi_index<name("levels"), level> level_index;
 
+      struct [[eosio::table]] leveltmp {
+         name id;
+         name categoryId;
+         std::string name;
+         bool archived;
+         uint32_t price;
+         uint32_t participantLimit;
+         uint32_t submissionPeriod;
+         uint32_t votePeriod;
+         uint32_t fee;
+         std::list<uint32_t> prizes;
+
+         uint64_t primary_key() const { return id.value; }
+      };
+
+      typedef eosio::multi_index<name("levelstmp"), leveltmp> leveltmp_index;
+
       /*
          TABLE: profiles
       */
@@ -577,6 +636,26 @@ class [[eosio::contract("flair")]] flair : public contract {
          profile,
          indexed_by<name("byusername"), const_mem_fun<profile, checksum256, &profile::by_username_hash>>
       > profile_index;
+
+      struct [[eosio::table]] profiletmp {
+         name id;
+         std::string username;
+         checksum256 usernameHash;
+         checksum256 imgHash;
+         std::string link;
+         std::string bio;
+         name account;
+         bool active;
+
+         uint64_t primary_key() const { return id.value; }
+         checksum256 by_username_hash() const { return usernameHash; }
+      };
+
+      typedef eosio::multi_index<
+         name("profilestmp"), 
+         profiletmp,
+         indexed_by<name("byusername"), const_mem_fun<profiletmp, checksum256, &profiletmp::by_username_hash>>
+      > profiletmp_index;
 
       /*
          TABLE: options
@@ -1220,6 +1299,32 @@ class [[eosio::contract("flair")]] flair : public contract {
             std::string lookAlike = username;
             lookAlike[i] = it->second;
             checkUsernameExistsSingle(lookAlike);
+         }
+      }
+
+      template <typename table_t, typename newtable_t, typename Lambda>
+      void move_table(uint64_t limit, Lambda&& migrator) {
+         table_t table( _self, _self.value );
+         newtable_t newtable( _self, _self.value );
+         table.begin();
+
+         auto index = 0;
+         auto itr = table.begin();
+
+         if (itr == table.end()) {
+            print("none to migrate");
+            return;
+         }
+
+         while (itr != table.end() && index < limit) {
+            print("migrate id: ", itr->id, "\n");
+            newtable.emplace(_self, [&](auto& row) {
+               migrator(itr, row);
+            });
+
+            table.erase(itr);
+            itr = table.begin();
+            ++index;
          }
       }
 };
