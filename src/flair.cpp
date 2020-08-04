@@ -134,7 +134,7 @@ class [[eosio::contract("flair")]] flair : public contract {
 
       [[eosio::action]]
       void addprofile(addprofargs params) {
-         // check(false, "Under Maintenance");
+         check(false, "Under Maintenance");
          require_auth( _self );
 
          check(checkusername(params.username), "Invalid Username");
