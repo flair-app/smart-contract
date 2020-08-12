@@ -326,7 +326,7 @@ class [[eosio::contract("flair")]] flair : public contract {
             if (contestItr != contests.end()) {
                uint32_t now = eosio::current_time_point().sec_since_epoch();
                auto contestEndTime = (safeint{contestItr->createdAt} + safeint{contestItr->submissionPeriod} + safeint{contestItr->votePeriod}).amount;
-               check(now > contestEndTime, "entryId: " + params.id.to_string() + ", You already have a running entry within this contest level.");
+               check(now > contestEndTime, "entryId: " + params.id.to_string() + ", You've already entered this contest. You can only submit one entry per contest.");
 
                byUserIdAndLevelIdIdx.modify(itr, _self, [&](contestEntry& row) {
                   row.open = false;
@@ -511,8 +511,11 @@ class [[eosio::contract("flair")]] flair : public contract {
          require_auth( _self );
          print("hello from update \n");
          distributeContestWinnings();
+         print("distributeContestWinnings completed \n");
          checkUnavailablePriceEntries();
+         print("checkUnavailablePriceEntries completed \n");
          archiveEntries();
+         print("archiveEntries completed \n");
       }
 
       [[eosio::action]]
@@ -857,18 +860,22 @@ class [[eosio::contract("flair")]] flair : public contract {
          Archive Entries after set expiriation  - used within update
       */
       void archiveEntries() {
+         print("archiveEntries 1 \n");
          entries_index entries(_self, _self.value);
          auto entriesByContest = entries.get_index<name("bycreatedat")>();
-
+         print("archiveEntries 2 \n");
          vote_index votes(_self, _self.value);
          auto votesByEntry = votes.get_index<name("byentryid")>();
-
+         print("archiveEntries 3 \n");
          uint64_t now = eosio::current_time_point().sec_since_epoch();
+         print("archiveEntries 3.2 \n");
          uint64_t archSec = get_option_int(name{"entryarchsec"});
-
+         print("archiveEntries 4 \n");
          int limitIndex = 0;
          auto entryItr = entriesByContest.begin();
+         print("archiveEntries 5 \n");
          while(entryItr != entriesByContest.end() && limitIndex < 500 && entryItr->createdAt <= now - archSec) {
+            print("archive entry", entryItr->id, "\n");
             auto voteItr = votesByEntry.lower_bound(entryItr->id.value);
             while(voteItr != votesByEntry.end() && limitIndex < 500 && voteItr->entryId == entryItr->id) {
                voteItr = votesByEntry.erase(voteItr);
@@ -1161,12 +1168,12 @@ class [[eosio::contract("flair")]] flair : public contract {
 
          bool isHttp = data.rfind("http:", 0) >= 0 || data.rfind("https:", 0) >= 0;
          check(isHttp, "Link must start with http or https");
-         check(data.length() <= 2000, 'Link is too long, must be 2000 characters or less');
+         check(data.length() <= 2000, "Link is too long, must be 2000 characters or less");
          htmlspecialchars(data);
       }
 
       void checkAndSanitizeBio(std::string& data) {
-         check(data.length() <= 150, 'Bio is too long, must be 150 characters or less');
+         check(data.length() <= 150, "Bio is too long, must be 150 characters or less");
          htmlspecialchars(data);
       }
 
