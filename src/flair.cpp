@@ -311,8 +311,13 @@ class [[eosio::contract("flair")]] flair : public contract {
          profile_index profiles(_self, _self.value);
          auto userProfile = profiles.find(params.userId.value);
 
+         level_index levels(_self, _self.value);
+         auto levelItr = levels.find(params.levelId.value);
+
          require_auth( userProfile->account );
          check(userProfile->active, "Profile must be active to enter a contest");
+         check(levelItr->archived == 0, "Level must be active to enter a contest");
+
          entries_index entries(_self, _self.value);
 
          auto byUserIdAndLevelIdIdx = entries.get_index<name("byuserandlvl")>();         
