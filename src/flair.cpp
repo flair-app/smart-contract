@@ -761,7 +761,7 @@ class [[eosio::contract("flair")]] flair : public contract {
 
             print("level fee: ", levelItr->fee, "\n");
             check(levelItr->fee < 1000, "interval error: fee is too large, must be below 100%");
-            asset feeAmount = (contestPrize * 10) / levelItr->fee;
+            asset feeAmount = (contestPrize * levelItr->fee) / 1000;
             asset winTotal = contestPrize - feeAmount;
             asset prizeRemainder = contestPrize;
 

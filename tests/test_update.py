@@ -223,7 +223,7 @@ class UpdateActionsUnitTest(unittest.TestCase):
                 "participantLimit": 4,
                 "submissionPeriod": 4,
                 "votePeriod": 4,
-                "fee": 100, # = 10%
+                "fee": 45, # = 4.5%
                 "prizes": [70, 30],
             }], 
             permission=(HOST, Permission.ACTIVE)
@@ -399,9 +399,9 @@ class UpdateActionsUnitTest(unittest.TestCase):
         bobAfterBal = float(self.getEOSBalance(self.BOB))
 
         
-        self.assertAlmostEqual(feeAfterBal - feeBeforeBal, 0.6)
-        self.assertAlmostEqual(aliceAfterBal - aliceBeforeBal, 1.62)
-        self.assertAlmostEqual(bobAfterBal - bobBeforeBal, 3.78)
+        self.assertAlmostEqual(feeAfterBal - feeBeforeBal, 0.27)
+        self.assertAlmostEqual(aliceAfterBal - aliceBeforeBal, 1.719)
+        self.assertAlmostEqual(bobAfterBal - bobBeforeBal, 4.011)
 
     def test_update_action_sends_winnings_to_winners_when_tied_and_flair_only_once(self):
         SCENARIO("test_update_action_sends_winnings_to_winners_when_tied_and_flair_only_once")
