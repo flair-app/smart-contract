@@ -335,10 +335,11 @@ class [[eosio::contract("flair")]] flair : public contract {
          auto byUserIdAndLevelIdIdx = entries.get_index<name("byuserandlvl")>();         
          auto itr = byUserIdAndLevelIdIdx.find(composite_key(params.userId.value, params.levelId.value, true));
          
+         contest_index contests(_self, _self.value);
+
          // 1. get by index with UserId, LevelId, and open = 1
          // 2. check if is actually open or not, mark open = 0 if so
          if(itr != byUserIdAndLevelIdIdx.end() && itr->contestId > 0) {
-            contest_index contests(_self, _self.value);
             auto contestItr = contests.find(itr->contestId);
             if (contestItr != contests.end()) {
                uint32_t now = eosio::current_time_point().sec_since_epoch();
@@ -733,7 +734,7 @@ class [[eosio::contract("flair")]] flair : public contract {
          contest,
          indexed_by<name("bylevel"), const_mem_fun<contest, uint128_t, &contest::bylevel>>,
          indexed_by<name("byendtime"), const_mem_fun<contest, uint64_t, &contest::endtime>>,
-         indexed_by<name("bylevelandstart"), const_mem_fun<contest, uint128_t, &contest::level_and_start>>
+         indexed_by<name("bylevelstart"), const_mem_fun<contest, uint128_t, &contest::level_and_start>>
       > contest_index;
 
       /*
@@ -1144,7 +1145,7 @@ class [[eosio::contract("flair")]] flair : public contract {
             });
             return true;
          } else {
-            auto contestByLevelAndStart = contests.get_index<name("bylevelandstart")>();
+            auto contestByLevelAndStart = contests.get_index<name("bylevelstart")>();
             auto contestOpenItr = contestByLevelAndStart.lower_bound(composite_key(entryItr->levelId.value, now));
             uint32_t levelContestCount = 0;
 
@@ -1176,7 +1177,7 @@ class [[eosio::contract("flair")]] flair : public contract {
                row.submissionsClosed = false;
                row.votePeriod = levelItr->votePeriod;
                row.createdAt = eosio::current_time_point().sec_since_epoch();
-               row.fixedPrize = levelFixedPrizeCurrency;
+               row.fixedPrize = levelFixedPrizeCurrency.amount;
                row.voteStartUTCHour = levelItr->voteStartUTCHour;
                row.paid = false;
             });
