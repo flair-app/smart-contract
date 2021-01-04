@@ -68,6 +68,9 @@ class [[eosio::contract("flair")]] flair : public contract {
          uint32_t votePeriod;
          uint32_t fee;
          std::list<uint32_t> prizes;
+         uint32_t fixedPrize;
+         uint32_t allowedSimultaneousContests;
+         uint32_t voteStartUTCHour;
       };
 
       [[eosio::action]]
@@ -87,6 +90,9 @@ class [[eosio::contract("flair")]] flair : public contract {
             row.archived = false;
             row.fee = params.fee;
             row.prizes = params.prizes;
+            row.fixedPrize = params.fixedPrize;
+            row.allowedSimultaneousContests = params.allowedSimultaneousContests;
+            row.voteStartUTCHour = params.voteStartUTCHour;
          });
       }
 
@@ -102,6 +108,9 @@ class [[eosio::contract("flair")]] flair : public contract {
          uint32_t votePeriod;
          uint32_t fee;
          std::list<uint32_t> prizes;
+         uint32_t fixedPrize;
+         uint32_t allowedSimultaneousContests;
+         uint32_t voteStartUTCHour;
       };
 
       [[eosio::action]]
@@ -121,6 +130,9 @@ class [[eosio::contract("flair")]] flair : public contract {
             row.votePeriod = data.votePeriod;
             row.fee = data.fee;
             row.prizes = data.prizes;
+            row.fixedPrize = data.fixedPrize;
+            row.allowedSimultaneousContests = data.allowedSimultaneousContests;
+            row.voteStartUTCHour = data.voteStartUTCHour;
          });
       }
 
@@ -343,7 +355,7 @@ class [[eosio::contract("flair")]] flair : public contract {
             });
          }
 
-         entries.emplace(_self, [&]( contestEntry& row ) {
+         auto entryItr = entries.emplace(_self, [&]( contestEntry& row ) {
             row.id = params.id;
             row.userId = params.userId;
             row.levelId = params.levelId;
@@ -357,6 +369,10 @@ class [[eosio::contract("flair")]] flair : public contract {
             row.votes = 0;
             row.open = true;
          });
+
+         if(levelItr->price == 0) {
+            activateEntry<decltype(entries), decltype(entryItr)>(entries, entryItr);
+         }
       }
 
       /*
@@ -370,6 +386,12 @@ class [[eosio::contract("flair")]] flair : public contract {
                print("Currency doesn't match: ", quantity.symbol.code().to_string(), " != ", currency);
             }
             return;
+         }
+
+         if (memo == "prizefund") {
+            auto prizefund = get_option_int(name{"prizefund"});
+            prizefund = (safeint{prizefund} + safeint{quantity.amount}).amount;
+            set_option(name{"prizefund"}, prizefund);
          }
 
          // use memo as id to lookup entry
@@ -451,8 +473,8 @@ class [[eosio::contract("flair")]] flair : public contract {
          auto contestItr = contests.find(entryItr->contestId);
          uint32_t now = eosio::current_time_point().sec_since_epoch();
 
-         check(now > (safeint{contestItr->createdAt} + safeint{contestItr->submissionPeriod}).amount, "Voting has not begun yet.");
-         check(now <= (safeint{contestItr->createdAt} + safeint{contestItr->submissionPeriod} + safeint{contestItr->votePeriod}).amount, "Voting has ended for this contest.");
+         check(now > contestItr->votestarttime(), "Voting has not begun yet.");
+         check(now <= contestItr->endtime(), "Voting has ended for this contest.");
 
          // determine if already voted
          vote_index votes(_self, _self.value);
@@ -557,6 +579,9 @@ class [[eosio::contract("flair")]] flair : public contract {
          uint32_t votePeriod;
          uint32_t fee;
          std::list<uint32_t> prizes;
+         uint32_t fixedPrize;
+         uint32_t allowedSimultaneousContests;
+         uint32_t voteStartUTCHour;
 
          uint64_t primary_key() const { return id.value; }
       };
@@ -677,18 +702,38 @@ class [[eosio::contract("flair")]] flair : public contract {
          uint32_t submissionPeriod;
          uint32_t votePeriod;
          uint32_t createdAt;
+         uint64_t fixedPrize;
+         uint32_t voteStartUTCHour;
          bool paid;
 
          uint64_t primary_key() const { return id; }
          uint128_t bylevel() const { return composite_key(levelId.value, submissionsClosed); }
-         uint64_t byendtime() const { return (safeint{createdAt} + safeint{submissionPeriod} + safeint{votePeriod}).amount; }
+         uint64_t votestarttime() const {
+            if (voteStartUTCHour == 0) {
+               return (safeint{createdAt} + safeint{submissionPeriod}).amount;
+            }
+
+            auto hours = (createdAt / 3600) % 24;
+            auto minutes = (createdAt / 60) % 60;
+            auto seconds = createdAt % 60;
+            if (hours < voteStartUTCHour) {
+               return createdAt - (minutes * 60) - seconds + ((voteStartUTCHour - hours) * 3600);
+            } else {
+               return createdAt - (minutes * 60) - seconds + ((24 + voteStartUTCHour - hours) * 3600);
+            }
+         }
+         uint64_t endtime() const { return (safeint{votestarttime()} + safeint{votePeriod}).amount; }
+         uint128_t level_and_start() const { 
+            return composite_key(levelId.value, votestarttime());
+         }
       };
 
       typedef eosio::multi_index<
          name("contests"),
          contest,
          indexed_by<name("bylevel"), const_mem_fun<contest, uint128_t, &contest::bylevel>>,
-         indexed_by<name("byendtime"), const_mem_fun<contest, uint64_t, &contest::byendtime>>
+         indexed_by<name("byendtime"), const_mem_fun<contest, uint64_t, &contest::endtime>>,
+         indexed_by<name("bylevelandstart"), const_mem_fun<contest, uint128_t, &contest::level_and_start>>
       > contest_index;
 
       /*
@@ -731,9 +776,11 @@ class [[eosio::contract("flair")]] flair : public contract {
          }
 
          auto contestItr = contestItrEndTime;
+
          bool hitBeginning = false;
          while(!hitBeginning && contestItr->paid == false) {
             print("contest id: ", contestItr->id, "\n");
+
             entries_index entries(_self, _self.value);
             auto entriesByContest = entries.get_index<name("bycontest")>();
             auto contestEntriesItr = entriesByContest.lower_bound(contestItr->id);
@@ -741,14 +788,21 @@ class [[eosio::contract("flair")]] flair : public contract {
             auto levelItr = levels.find(contestItr->levelId.value);
 
             symbol s(get_option(name{'currency'}), 4);
+
             asset contestPrize(0, s);
             std::map<uint64_t, std::list<uint64_t>> winners;
             uint64_t votes = 0;
 
+            if (contestItr->fixedPrize > 0) {
+               contestPrize = asset{contestItr->fixedPrize, s};
+            }
+
             // sum amount of all entry within contest & find winner(s)
             for (auto entryItr = contestEntriesItr; entryItr->contestId == contestItr->id && entryItr != entriesByContest.end(); entryItr++) {
                print("user: ", entryItr->userId, " votes: ", entryItr->votes, " amount: ", entryItr->amount, "\n");
-               contestPrize += asset(entryItr->amount, s);
+               if (contestItr->fixedPrize == 0) {
+                  contestPrize += asset(entryItr->amount, s);
+               }
                std::list<uint64_t> winnersByVotes; 
                if(winners.find(entryItr->votes) != winners.end()) {
                   winnersByVotes = winners[entryItr->votes];
@@ -761,7 +815,10 @@ class [[eosio::contract("flair")]] flair : public contract {
 
             print("level fee: ", levelItr->fee, "\n");
             check(levelItr->fee < 1000, "interval error: fee is too large, must be below 100%");
-            asset feeAmount = (contestPrize * levelItr->fee) / 1000;
+            asset feeAmount = contestPrize * levelItr->fee / 1000;
+            if (contestItr->fixedPrize > 0) {
+               feeAmount.set_amount(0);
+            }
             asset winTotal = contestPrize - feeAmount;
             asset prizeRemainder = contestPrize;
 
@@ -1025,50 +1082,56 @@ class [[eosio::contract("flair")]] flair : public contract {
             contestPrice = curContestItr->price;
          } else {
             contestPrice = levelItr->price;
-         }
-
-         // determine eos price high since entry created
-         curprice_index curprices(_self, _self.value);
-         auto pricesByEndTime = curprices.get_index<name("byendtime")>();
-         auto priceItr = pricesByEndTime.lower_bound(entryItr->createdAt);
-
-         uint64_t priceHigh = 0;
-
-         for (auto itr = priceItr; itr != pricesByEndTime.end(); itr++) {
-            print("debug price high: ", itr->usdHigh, "\n");
-            if(itr->usdHigh > priceHigh) {
-               priceHigh = itr->usdHigh;
+            if (levelItr->fixedPrize > 0) {
+               auto prizefund = get_option_int(name{"prizefund"});
+               check(prizefund >= usdToCurrencyAmount(levelItr->fixedPrize), "Prize fund must have enough money to pay out prize.");
             }
          }
 
-         // mark entry as priceUnavailable if lastest currency price openTime + intervalSec is older than the set required price freshness
-         uint64_t freshTime = get_option_int(name{"pricefresh"});
-         auto lastPrice = --pricesByEndTime.end();
+         if (contestPrice != 0) {
+            // determine eos price high since entry created
+            curprice_index curprices(_self, _self.value);
+            auto pricesByEndTime = curprices.get_index<name("byendtime")>();
+            auto priceItr = pricesByEndTime.lower_bound(entryItr->createdAt);
 
-         bool freshPrice = (safeint{lastPrice->openTime} + safeint{lastPrice->intervalSec} + safeint{freshTime}).amount > now;
-         print(
-            "price fresh debug: freshPrice=", freshPrice,
-            " lastEndTime=", (safeint{lastPrice->openTime} + safeint{lastPrice->intervalSec}).amount, 
-            ", freshTime=", freshTime, " | ", (safeint{lastPrice->openTime} + safeint{lastPrice->intervalSec} + safeint{freshTime}).amount, " > ", now, 
-            "\n"
-         );
-         if(priceHigh <= 0 || !freshPrice) {
-            entries.modify(entryItr, _self, [&](contestEntry& row) {
-               row.priceUnavailable = true;
-            });
+            uint64_t priceHigh = 0;
 
-            print("Currency Price Unavailable: run update action to recheck once price has been updated.\n");
-            return false;
-         }
+            for (auto itr = priceItr; itr != pricesByEndTime.end(); itr++) {
+               print("debug price high: ", itr->usdHigh, "\n");
+               if(itr->usdHigh > priceHigh) {
+                  priceHigh = itr->usdHigh;
+               }
+            }
 
-         // fail if quantity is not enough
-         print("debug price 1: ", priceHigh, " ", entryItr->amount, " ", contestPrice, "\n");
-         // paid in cents
-         auto paidAmt = (safeint{priceHigh} * safeint{entryItr->amount} / 1000000.0).amount;
-         print("debug price 2: paidAmt: ¢", paidAmt, ", contestPrice: ¢", contestPrice, "\n");
-         if (paidAmt < contestPrice) {
-            print("Payment not enough only ¢", paidAmt,".\n");
-            return false;
+            // mark entry as priceUnavailable if lastest currency price openTime + intervalSec is older than the set required price freshness
+            uint64_t freshTime = get_option_int(name{"pricefresh"});
+            auto lastPrice = --pricesByEndTime.end();
+
+            bool freshPrice = (safeint{lastPrice->openTime} + safeint{lastPrice->intervalSec} + safeint{freshTime}).amount > now;
+            print(
+               "price fresh debug: freshPrice=", freshPrice,
+               " lastEndTime=", (safeint{lastPrice->openTime} + safeint{lastPrice->intervalSec}).amount, 
+               ", freshTime=", freshTime, " | ", (safeint{lastPrice->openTime} + safeint{lastPrice->intervalSec} + safeint{freshTime}).amount, " > ", now, 
+               "\n"
+            );
+            if(priceHigh <= 0 || !freshPrice) {
+               entries.modify(entryItr, _self, [&](contestEntry& row) {
+                  row.priceUnavailable = true;
+               });
+
+               print("Currency Price Unavailable: run update action to recheck once price has been updated.\n");
+               return false;
+            }
+
+            // fail if quantity is not enough
+            print("debug price 1: ", priceHigh, " ", entryItr->amount, " ", contestPrice, "\n");
+            // paid in cents
+            auto paidAmt = (safeint{priceHigh} * safeint{entryItr->amount} / 1000000.0).amount;
+            print("debug price 2: paidAmt: ¢", paidAmt, ", contestPrice: ¢", contestPrice, "\n");
+            if (paidAmt < contestPrice) {
+               print("Payment not enough only ¢", paidAmt,".\n");
+               return false;
+            }
          }
 
          if (curContestValid) {
@@ -1081,6 +1144,24 @@ class [[eosio::contract("flair")]] flair : public contract {
             });
             return true;
          } else {
+            auto contestByLevelAndStart = contests.get_index<name("bylevelandstart")>();
+            auto contestOpenItr = contestByLevelAndStart.lower_bound(composite_key(entryItr->levelId.value, now));
+            uint32_t levelContestCount = 0;
+
+            for (auto itr = contestOpenItr; itr != contestByLevelAndStart.begin(); itr--) {
+               if (itr->endtime() < now) {
+                  break;
+               }
+               levelContestCount++;
+            }
+
+            check(levelContestCount < levelItr->allowedSimultaneousContests, "This level is full");
+
+            auto prizefund = get_option_int(name{"prizefund"});
+            auto levelFixedPrizeCurrency = usdToCurrencyAmount(levelItr->fixedPrize);
+            prizefund = (safeint{prizefund} - levelFixedPrizeCurrency).amount;
+            set_option(name{"prizefund"}, prizefund);
+
             uint64_t newContestId = contests.available_primary_key();
             if (newContestId == 0) { newContestId++; }
             print("newContestId: ", newContestId, "\n");
@@ -1095,6 +1176,8 @@ class [[eosio::contract("flair")]] flair : public contract {
                row.submissionsClosed = false;
                row.votePeriod = levelItr->votePeriod;
                row.createdAt = eosio::current_time_point().sec_since_epoch();
+               row.fixedPrize = levelFixedPrizeCurrency;
+               row.voteStartUTCHour = levelItr->voteStartUTCHour;
                row.paid = false;
             });
 
@@ -1114,6 +1197,13 @@ class [[eosio::contract("flair")]] flair : public contract {
          }
 
          return false;
+      }
+
+      safeint usdToCurrencyAmount(uint32_t usd) {
+         curprice_index curprices(_self, _self.value);
+         auto pricesByEndTime = curprices.get_index<name("byendtime")>();
+         auto priceItr = pricesByEndTime.end();
+         return (safeint{usd} * 1000000) / safeint{priceItr->usdHigh};
       }
 
       void set_option(name id, std::string value) {
