@@ -535,7 +535,7 @@ class [[eosio::contract("flair")]] flair : public contract {
       void migratecntst(uint64_t limit) {
          require_auth( _self );
 
-         move_table<contest_index, contesttmp_index>(limit, [&](auto itr, contesttmp& row) {
+         move_table<contesttmp_index, contest_index>(limit, [&](auto itr, contest& row) {
             print("migrate contest: ", itr->id);
             row.id = itr->id;
             row.levelId = itr->levelId;
@@ -557,7 +557,7 @@ class [[eosio::contract("flair")]] flair : public contract {
       void migratelvl(uint64_t limit) {
          require_auth( _self );
 
-         move_table<level_index, leveltmp_index>(limit, [&](auto itr, leveltmp& row) {
+         move_table<leveltmp_index, level_index>(limit, [&](auto itr, level& row) {
             print("migrate level: ", itr->id);
             row.id = itr->id;
             row.categoryId = itr->categoryId;
@@ -601,6 +601,9 @@ class [[eosio::contract("flair")]] flair : public contract {
          uint32_t votePeriod;
          uint32_t fee;
          std::list<uint32_t> prizes;
+         uint32_t fixedPrize;
+         uint32_t allowedSimultaneousContests;
+         uint32_t voteStartUTCHour;
 
          uint64_t primary_key() const { return id.value; }
       };
@@ -741,18 +744,38 @@ class [[eosio::contract("flair")]] flair : public contract {
          uint32_t submissionPeriod;
          uint32_t votePeriod;
          uint32_t createdAt;
+         uint32_t fixedPrize;
+         uint32_t voteStartUTCHour;
          bool paid;
 
          uint64_t primary_key() const { return id; }
          uint128_t bylevel() const { return composite_key(levelId.value, submissionsClosed); }
-         uint64_t byendtime() const { return (safeint{createdAt} + safeint{submissionPeriod} + safeint{votePeriod}).amount; }
+         uint64_t votestarttime() const {
+            if (voteStartUTCHour == 0) {
+               return (safeint{createdAt} + safeint{submissionPeriod}).amount;
+            }
+
+            auto hours = (createdAt / 3600) % 24;
+            auto minutes = (createdAt / 60) % 60;
+            auto seconds = createdAt % 60;
+            if (hours < voteStartUTCHour) {
+               return createdAt - (minutes * 60) - seconds + ((voteStartUTCHour - hours) * 3600);
+            } else {
+               return createdAt - (minutes * 60) - seconds + ((24 + voteStartUTCHour - hours) * 3600);
+            }
+         }
+         uint64_t endtime() const { return (safeint{votestarttime()} + safeint{votePeriod}).amount; }
+         uint128_t level_and_start() const { 
+            return composite_key(levelId.value, votestarttime());
+         }
       };
 
       typedef eosio::multi_index<
          name("contests"),
          contest,
          indexed_by<name("bylevel"), const_mem_fun<contest, uint128_t, &contest::bylevel>>,
-         indexed_by<name("byendtime"), const_mem_fun<contest, uint64_t, &contest::byendtime>>
+         indexed_by<name("byendtime"), const_mem_fun<contest, uint64_t, &contest::endtime>>,
+         indexed_by<name("bylevelstart"), const_mem_fun<contest, uint128_t, &contest::level_and_start>>
       > contest_index;
 
       /*
