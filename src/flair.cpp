@@ -628,7 +628,7 @@ class [[eosio::contract("flair")]] flair : public contract {
          uint64_t primary_key() const { return id.value; }
       };
 
-      typedef eosio::multi_index<name("levelstmp"), level> leveltmp_index;
+      typedef eosio::multi_index<name("levelstmp"), leveltmp> leveltmp_index;
 
       /*
          TABLE: profiles
