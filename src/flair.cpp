@@ -528,6 +528,50 @@ class [[eosio::contract("flair")]] flair : public contract {
          // noop
       }
 
+      /*
+         Migrate Profile
+      */
+      [[eosio::action]]
+      void migratecntst(uint64_t limit) {
+         require_auth( _self );
+
+         move_table<contest_index, contesttmp_index>(limit, [&](auto itr, contesttmp& row) {
+            print("migrate contest: ", itr->id);
+            row.id = itr->id;
+            row.levelId = itr->levelId;
+            row.price = itr->price;
+            row.participantLimit = itr->participantLimit;
+            row.participantCount = itr->participantCount;
+            row.submissionsClosed = itr->submissionsClosed;
+            row.submissionPeriod = itr->submissionPeriod;
+            row.votePeriod = itr->votePeriod;
+            row.createdAt = itr->createdAt;
+            row.paid = itr->paid;
+         });
+      }
+
+      /*
+         Migrate Entry
+      */
+      [[eosio::action]]
+      void migratelvl(uint64_t limit) {
+         require_auth( _self );
+
+         move_table<level_index, leveltmp_index>(limit, [&](auto itr, leveltmp& row) {
+            print("migrate level: ", itr->id);
+            row.id = itr->id;
+            row.categoryId = itr->categoryId;
+            row.name = itr->name;
+            row.price = itr->price;
+            row.participantLimit = itr->participantLimit;
+            row.submissionPeriod = itr->submissionPeriod;
+            row.votePeriod = itr->votePeriod;
+            row.archived = itr->archived;
+            row.fee = itr->fee;
+            row.prizes = itr->prizes;
+         });
+      }
+
    private:
       /*
          TABLE: categories
@@ -562,6 +606,26 @@ class [[eosio::contract("flair")]] flair : public contract {
       };
 
       typedef eosio::multi_index<name("levels"), level> level_index;
+
+      /*
+         TABLE: levels migrate table
+      */
+      struct [[eosio::table]] leveltmp {
+         name id;
+         name categoryId;
+         std::string name;
+         bool archived;
+         uint32_t price;
+         uint32_t participantLimit;
+         uint32_t submissionPeriod;
+         uint32_t votePeriod;
+         uint32_t fee;
+         std::list<uint32_t> prizes;
+
+         uint64_t primary_key() const { return id.value; }
+      };
+
+      typedef eosio::multi_index<name("levelstmp"), level> leveltmp_index;
 
       /*
          TABLE: profiles
@@ -690,6 +754,26 @@ class [[eosio::contract("flair")]] flair : public contract {
          indexed_by<name("bylevel"), const_mem_fun<contest, uint128_t, &contest::bylevel>>,
          indexed_by<name("byendtime"), const_mem_fun<contest, uint64_t, &contest::byendtime>>
       > contest_index;
+
+      /*
+         TABLE: contest migration table
+      */
+      struct [[eosio::table]] contesttmp {
+         uint64_t id;
+         name levelId;
+         uint64_t price;
+         uint32_t participantLimit;
+         uint32_t participantCount;
+         bool submissionsClosed;
+         uint32_t submissionPeriod;
+         uint32_t votePeriod;
+         uint32_t createdAt;
+         bool paid;
+
+         uint64_t primary_key() const { return id; }
+      };
+
+      typedef eosio::multi_index<name("conteststmp"), contesttmp> contesttmp_index;
 
       /*
          TABLE: votes
@@ -1232,6 +1316,32 @@ class [[eosio::contract("flair")]] flair : public contract {
             std::string lookAlike = username;
             lookAlike[i] = it->second;
             checkUsernameExistsSingle(lookAlike);
+         }
+      }
+
+      template <typename table_t, typename newtable_t, typename Lambda>
+      void move_table(uint64_t limit, Lambda&& migrator) {
+         table_t table( _self, _self.value );
+         newtable_t newtable( _self, _self.value );
+         table.begin();
+
+         auto index = 0;
+         auto itr = table.begin();
+
+         if (itr == table.end()) {
+            print("none to migrate");
+            return;
+         }
+
+         while (itr != table.end() && index < limit) {
+            print("migrate id: ", itr->id, "\n");
+            newtable.emplace(_self, [&](auto& row) {
+               migrator(itr, row);
+            });
+
+            table.erase(itr);
+            itr = table.begin();
+            ++index;
          }
       }
 };
