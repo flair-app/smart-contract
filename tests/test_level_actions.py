@@ -53,6 +53,9 @@ class LevelActionsUnitTest(unittest.TestCase):
                 "votePeriod": 12,
                 "fee": 15, # = 1.5%
                 "prizes": [70, 20, 10],
+                "fixedPrize": 0,
+                "allowedSimultaneousContests": 0,
+                "voteStartUTCHour": 0,
             }], 
             permission=(HOST, Permission.ACTIVE)
         )
@@ -87,6 +90,9 @@ class LevelActionsUnitTest(unittest.TestCase):
                     "votePeriod": 12,
                     "fee": 15, # = 1.5%
                     "prizes": [70, 20, 10],
+                    "fixedPrize": 0,
+                    "allowedSimultaneousContests": 0,
+                    "voteStartUTCHour": 0,
                 }], 
                 permission=(ALICE, Permission.ACTIVE)
             )
@@ -105,6 +111,9 @@ class LevelActionsUnitTest(unittest.TestCase):
                     "votePeriod": 12,
                     "fee": 15, # = 1.5%
                     "prizes": [70, 20, 10],
+                    "fixedPrize": 0,
+                    "allowedSimultaneousContests": 0,
+                    "voteStartUTCHour": 0,
                 }], 
                 permission=(HOST, Permission.ACTIVE)
             )
@@ -122,6 +131,9 @@ class LevelActionsUnitTest(unittest.TestCase):
                 "votePeriod": 12,
                 "fee": 15, # = 1.5%
                 "prizes": [70, 20, 10],
+                "fixedPrize": 0,
+                "allowedSimultaneousContests": 0,
+                "voteStartUTCHour": 0,
             }], 
             permission=(HOST, Permission.ACTIVE),
             force_unique=1
@@ -140,6 +152,9 @@ class LevelActionsUnitTest(unittest.TestCase):
                     "votePeriod": 12,
                     "fee": 15, # = 1.5%
                     "prizes": [70, 20, 10],
+                    "fixedPrize": 0,
+                    "allowedSimultaneousContests": 0,
+                    "voteStartUTCHour": 0,
                 }, 
                 permission=(HOST, Permission.ACTIVE),
                 force_unique=1
@@ -158,6 +173,9 @@ class LevelActionsUnitTest(unittest.TestCase):
                 "votePeriod": 12,
                 "fee": 15, # = 1.5%
                 "prizes": [70, 20, 10],
+                "fixedPrize": 0,
+                "allowedSimultaneousContests": 0,
+                "voteStartUTCHour": 0,
             }],
             permission=(HOST, Permission.ACTIVE),
             force_unique=1

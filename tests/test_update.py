@@ -225,6 +225,30 @@ class UpdateActionsUnitTest(unittest.TestCase):
                 "votePeriod": 4,
                 "fee": 45, # = 4.5%
                 "prizes": [70, 30],
+                "fixedPrize": 0,
+                "allowedSimultaneousContests": 0,
+                "voteStartUTCHour": 0,
+            }], 
+            permission=(HOST, Permission.ACTIVE)
+        )
+
+        self.levelId2 = self.randomEOSIOId()
+        
+        HOST.push_action(
+            "createlevel", 
+            [{
+                "id":self.levelId2,
+                "name":"Gold",
+                "categoryId": "music",
+                "price": 0,
+                "participantLimit": 4,
+                "submissionPeriod": 4,
+                "votePeriod": 4,
+                "fee": 0, # = 4.5%
+                "prizes": [100],
+                "fixedPrize": 1000,
+                "allowedSimultaneousContests": 0,
+                "voteStartUTCHour": 0,
             }], 
             permission=(HOST, Permission.ACTIVE)
         )
@@ -464,9 +488,9 @@ class UpdateActionsUnitTest(unittest.TestCase):
         bobAfterBal = float(self.getEOSBalance(self.BOB))
         aliceAfterBal = float(self.getEOSBalance(self.ALICE))
         
-        self.assertAlmostEqual(feeAfterBal - feeBeforeBal, 0.4)
-        self.assertAlmostEqual(bobAfterBal - bobBeforeBal, 1.8)
-        self.assertAlmostEqual(aliceAfterBal - aliceBeforeBal, 1.8)
+        self.assertAlmostEqual(bobAfterBal - bobBeforeBal, 1.91)
+        self.assertAlmostEqual(aliceAfterBal - aliceBeforeBal, 1.91)
+        self.assertAlmostEqual(feeAfterBal - feeBeforeBal, 0.18)
 
     def test_update_action_doesnt_send_winnings_before_contest_ends(self):
         SCENARIO("test_update_action_doesnt_send_winnings_before_contest_ends")
@@ -617,6 +641,134 @@ class UpdateActionsUnitTest(unittest.TestCase):
         entriesRes = HOST.table("entries", HOST, lower=self.entryId, key_type="name")
         print(entriesRes)
         self.assertEqual(len(entriesRes.json["rows"]), 0)
+
+    def test_update_action_sends_fixed_prize_winnings_to_winner_and_flair_only_once(self):
+        SCENARIO("test_update_action_sends_winnings_to_winner_and_flair_only_once")
+
+        print("test \n")
+        TOKENHOST.push_action(
+            "transfer",
+            {
+                "from": self.ALICE,
+                "to": HOST,
+                "quantity": "2.0000 EOS", 
+                "memo": "prizefund",
+            },
+            force_unique=True,
+            permission=(self.ALICE, Permission.ACTIVE)
+        )
+        print("test 2 \n")
+        self.entryId4 = self.randomEOSIOId()
+        HOST.push_action(
+            "entercontest",
+            [{
+                "id": self.entryId4,
+                "userId": self.userId,
+                "levelId": self.levelId2,
+                "videoHash360p": self.videoHash360p,
+                "videoHash480p": self.videoHash480p,
+                "videoHash720p": self.videoHash720p,
+                "videoHash1080p": self.videoHash1080p,
+                "coverHash": self.coverHash,
+            }],
+            permission=(self.ALICE, Permission.ACTIVE)
+        )
+        print("test 3 \n")
+
+        self.entryId5 = self.randomEOSIOId()
+        HOST.push_action(
+            "entercontest",
+            [{
+                "id": self.entryId5,
+                "userId": self.userId2,
+                "levelId": self.levelId2,
+                "videoHash360p": self.videoHash360p,
+                "videoHash480p": self.videoHash480p,
+                "videoHash720p": self.videoHash720p,
+                "videoHash1080p": self.videoHash1080p,
+                "coverHash": self.coverHash,
+            }],
+            permission=(self.BOB, Permission.ACTIVE)
+        )
+
+        self.entryId6 = self.randomEOSIOId()
+        HOST.push_action(
+            "entercontest",
+            [{
+                "id": self.entryId6,
+                "userId": self.userId3,
+                "levelId": self.levelId2,
+                "videoHash360p": self.videoHash360p,
+                "videoHash480p": self.videoHash480p,
+                "videoHash720p": self.videoHash720p,
+                "videoHash1080p": self.videoHash1080p,
+                "coverHash": self.coverHash,
+            }],
+            permission=(self.CAROL, Permission.ACTIVE)
+        )
+
+        time.sleep(5)    
+
+        HOST.push_action(
+            "vote",
+            {
+                "entryId": self.entryId4,
+                "voterUserId": self.userId,
+            },
+            permission=(self.ALICE, Permission.ACTIVE)
+        )
+
+        HOST.push_action(
+            "vote",
+            {
+                "entryId": self.entryId5,
+                "voterUserId": self.userId2,
+            },
+            permission=(self.BOB, Permission.ACTIVE)
+        )
+
+        HOST.push_action(
+            "vote",
+            {
+                "entryId": self.entryId5,
+                "voterUserId": self.userId3,
+            },
+            permission=(self.CAROL, Permission.ACTIVE)
+        )
+
+        time.sleep(4)
+
+        HOST.push_action(
+            "addcurhigh",
+            {
+                "openTime": int(time.time()),
+                "usdHigh": 50000, # $5.0000
+                "intervalSec": 2, # 2 seconds
+            },
+            permission=(HOST, Permission.ACTIVE),
+            force_unique=1
+        )
+        
+        feeBeforeBal = float(self.getEOSBalance(self.FEEACCT))
+        aliceBeforeBal = float(self.getEOSBalance(self.ALICE))
+        bobBeforeBal = float(self.getEOSBalance(self.BOB))
+
+
+        HOST.table("contests", HOST)
+
+        HOST.push_action("update", force_unique=True, permission=(HOST, Permission.ACTIVE))
+        HOST.push_action("update", force_unique=True, permission=(HOST, Permission.ACTIVE))
+
+        feeAfterBal = float(self.getEOSBalance(self.FEEACCT))
+        aliceAfterBal = float(self.getEOSBalance(self.ALICE))
+        bobAfterBal = float(self.getEOSBalance(self.BOB))
+
+        
+        self.assertAlmostEqual(feeAfterBal - feeBeforeBal, 0.0)
+        self.assertAlmostEqual(aliceAfterBal - aliceBeforeBal, 0.0)
+        self.assertAlmostEqual(bobAfterBal - bobBeforeBal, 2.0)
+
+        HOST.table("options", HOST)
 
     @classmethod
     def tearDownClass(cls):

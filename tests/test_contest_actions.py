@@ -120,6 +120,8 @@ class ContestActionsUnitTest(unittest.TestCase):
                 "imgHash":"950fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9",
                 "account": ALICE,
                 "active": True,
+                "link": "",
+                "bio": "",
             }],
             permission=(HOST, Permission.ACTIVE)
         )
@@ -134,6 +136,8 @@ class ContestActionsUnitTest(unittest.TestCase):
                 "imgHash":"950fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9",
                 "account": BOB,
                 "active": True,
+                "link": "",
+                "bio": "",
             }],
             permission=(HOST, Permission.ACTIVE)
         )
@@ -148,6 +152,8 @@ class ContestActionsUnitTest(unittest.TestCase):
                 "imgHash":"950fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9",
                 "account": CAROL,
                 "active": True,
+                "link": "",
+                "bio": "",
             }],
             permission=(HOST, Permission.ACTIVE)
         )
@@ -162,6 +168,8 @@ class ContestActionsUnitTest(unittest.TestCase):
                 "imgHash":"950fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9",
                 "account": DAN,
                 "active": True,
+                "link": "",
+                "bio": "",
             }],
             permission=(HOST, Permission.ACTIVE)
         )
@@ -176,6 +184,8 @@ class ContestActionsUnitTest(unittest.TestCase):
                 "imgHash":"950fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9",
                 "account": ELLIOT,
                 "active": False,
+                "link": "",
+                "bio": "",
             }],
             permission=(HOST, Permission.ACTIVE)
         )
@@ -224,6 +234,51 @@ class ContestActionsUnitTest(unittest.TestCase):
                 "votePeriod": 2,
                 "fee": 100,
                 "prizes": [100],
+                "fixedPrize": 0,
+                "allowedSimultaneousContests": 0,
+                "voteStartUTCHour": 0,
+            }], 
+            permission=(HOST, Permission.ACTIVE)
+        )
+
+        self.levelId2 = self.randomEOSIOId()
+        
+        HOST.push_action(
+            "createlevel", 
+            [{
+                "id":self.levelId2,
+                "name":"Gold 2",
+                "categoryId": "music",
+                "price": 1000,
+                "participantLimit": 2,
+                "submissionPeriod": 0,
+                "votePeriod": 2,
+                "fee": 100,
+                "prizes": [100],
+                "fixedPrize": 0,
+                "allowedSimultaneousContests": 1,
+                "voteStartUTCHour": 12,
+            }], 
+            permission=(HOST, Permission.ACTIVE)
+        )
+
+        self.levelId3 = self.randomEOSIOId()
+        
+        HOST.push_action(
+            "createlevel", 
+            [{
+                "id":self.levelId3,
+                "name":"Gold 3",
+                "categoryId": "music",
+                "price": 1000,
+                "participantLimit": 2,
+                "submissionPeriod": 2,
+                "votePeriod": 2,
+                "fee": 0,
+                "prizes": [100],
+                "fixedPrize": 1000,
+                "allowedSimultaneousContests": 0,
+                "voteStartUTCHour": 0,
             }], 
             permission=(HOST, Permission.ACTIVE)
         )
@@ -375,22 +430,41 @@ class ContestActionsUnitTest(unittest.TestCase):
 
         tableRes = HOST.table("entries", HOST, lower="contestentry4", key_type="name")
 
-        entry = tableRes.json["rows"][0]
+        entry1 = tableRes.json["rows"][0]
+        entry2 = tableRes.json["rows"][1]
         now = int(time.time())
-        self.assertGreaterEqual(entry["createdAt"], now - 1)
-        del entry["createdAt"]
-        self.assertEqual(entry, {
+
+        self.assertGreaterEqual(entry1["createdAt"], now - 1)
+        del entry1["createdAt"]
+        self.assertEqual(entry1, {
+            "id": "contestentry4",
+            "userId": self.userId,
+            "levelId": self.levelId,
+            "contestId": 0,
+            "amount": 0,
+            "priceUnavailable": 0,
+            "open": 0,
+            "videoHash720p": "350fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9",
+            "videoHash1080p": "450fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9",
+            "coverHash": "550fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9",
+            "votes": 0,
+        })
+
+        self.assertGreaterEqual(entry2["createdAt"], now - 1)
+        del entry2["createdAt"]
+        print(entry2)
+        self.assertEqual(entry2, {
             "id": id,
             "userId": self.userId,
             "levelId": self.levelId,
             "contestId": 0,
             "amount": 0,
+            "priceUnavailable": 0,
+            "open": 1,
             "videoHash720p": videoHash720p,
             "videoHash1080p": videoHash1080p,
             "coverHash": coverHash,
-            "priceUnavailable": 0,
             "votes": 0,
-            "open": 1,
         })
 
     def test_entry_payment_activates_entry_in_contest(self):
@@ -1573,6 +1647,159 @@ class ContestActionsUnitTest(unittest.TestCase):
                 },
                 permission=(CAROL, Permission.ACTIVE)
             )
+
+    def test_entercontest_errors_when_not_enough_in_prizefund(self):
+        TOKENHOST.push_action(  
+            "transfer",
+            {
+                "from": ALICE,
+                "to": HOST,
+                "quantity": "1.9999 EOS", 
+                "memo": "prizefund",
+            },
+            force_unique=True,
+            permission=(ALICE, Permission.ACTIVE)
+        )
+
+        with self.assertRaises(Error):
+            videoHash720p = "350fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+            videoHash1080p = "450fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+            coverHash = "550fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+
+            id = "myentry555"
+            HOST.push_action(
+                "entercontest",
+                [{
+                    "id":id,
+                    "userId": self.userId,
+                    "levelId": self.levelId3,
+                    "videoHash720p": videoHash720p,
+                    "videoHash1080p": videoHash1080p,
+                    "coverHash": coverHash,
+                }],
+                permission=(ALICE, Permission.ACTIVE)
+            )
+
+    def test_new_contest_using_voteStartUTCHour_has_proper_starttime(self):
+        videoHash720p = "350fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+        videoHash1080p = "450fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+        coverHash = "550fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+
+        id = "myentry551"
+        HOST.push_action(
+            "entercontest",
+            [{
+                "id":id,
+                "userId": self.userId,
+                "levelId": self.levelId2,
+                "videoHash720p": videoHash720p,
+                "videoHash1080p": videoHash1080p,
+                "coverHash": coverHash,
+            }],
+            permission=(ALICE, Permission.ACTIVE)
+        )
+
+        TOKENHOST.push_action(
+            "transfer",
+            {
+                "from": ALICE,
+                "to": HOST,
+                "quantity": "2.0000 EOS", 
+                "memo": id,
+            },
+            force_unique=True,
+            permission=(ALICE, Permission.ACTIVE)
+        )
+
+        entriesRes = HOST.table("entries", HOST, lower=id, key_type="name")
+        entry = entriesRes.json["rows"][0]
+        self.assertEqual(entry["id"], id)
+        contestId1 = contestId = entry["contestId"]
+        self.assertNotEqual(contestId, 0)
+
+        # manually check console output to verify start time
+        HOST.push_action(
+            "vote",
+            {
+                "entryId": id,
+                "voterUserId": self.userId3,
+            },
+            permission=(CAROL, Permission.ACTIVE)
+        )
+    
+    def test_allowedSimultaneousContests(self):
+        videoHash720p = "350fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+        videoHash1080p = "450fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+        coverHash = "550fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+
+        id = "myentry552"
+        HOST.push_action(
+            "entercontest",
+            [{
+                "id":id,
+                "userId": self.userId,
+                "levelId": self.levelId2,
+                "videoHash720p": videoHash720p,
+                "videoHash1080p": videoHash1080p,
+                "coverHash": coverHash,
+            }],
+            permission=(ALICE, Permission.ACTIVE)
+        )
+
+        TOKENHOST.push_action(
+            "transfer",
+            {
+                "from": ALICE,
+                "to": HOST,
+                "quantity": "2.0000 EOS", 
+                "memo": id,
+            },
+            force_unique=True,
+            permission=(ALICE, Permission.ACTIVE)
+        )
+
+        id = "myentry553"
+        HOST.push_action(
+            "entercontest",
+            [{
+                "id":id,
+                "userId": self.userId2,
+                "levelId": self.levelId2,
+                "videoHash720p": videoHash720p,
+                "videoHash1080p": videoHash1080p,
+                "coverHash": coverHash,
+            }],
+            permission=(BOB, Permission.ACTIVE)
+        )
+
+        TOKENHOST.push_action(
+            "transfer",
+            {
+                "from": BOB,
+                "to": HOST,
+                "quantity": "2.0000 EOS", 
+                "memo": id,
+            },
+            force_unique=True,
+            permission=(BOB, Permission.ACTIVE)
+        )
+
+        with self.assertRaises(Error):
+            id = "myentry554"
+            HOST.push_action(
+                "entercontest",
+                [{
+                    "id":id,
+                    "userId": self.userId3,
+                    "levelId": self.levelId2,
+                    "videoHash720p": videoHash720p,
+                    "videoHash1080p": videoHash1080p,
+                    "coverHash": coverHash,
+                }],
+                permission=(CAROL, Permission.ACTIVE)
+            )
+            
+
 
     @classmethod
     def tearDownClass(cls):
