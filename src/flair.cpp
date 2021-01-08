@@ -937,30 +937,54 @@ class [[eosio::contract("flair")]] flair : public contract {
          Archive Entries after set expiriation  - used within update
       */
       void archiveEntries() {
-         print("archiveEntries 1 \n");
-         entries_index entries(_self, _self.value);
-         auto entriesByContest = entries.get_index<name("bycreatedat")>();
-         print("archiveEntries 2 \n");
+         contest_index contests( _self, _self.value );
+         auto contestsByEndtime = contests.get_index<name("byendtime")>();
+
          vote_index votes(_self, _self.value);
          auto votesByEntry = votes.get_index<name("byentryid")>();
-         print("archiveEntries 3 \n");
+
+         entries_index entries(_self, _self.value);
+         auto entriesByContest = entries.get_index<name("bycontest")>();
+         auto entriesByCreatedAt = entries.get_index<name("bycreatedat")>();
+
          uint64_t now = eosio::current_time_point().sec_since_epoch();
-         print("archiveEntries 3.2 \n");
          uint64_t archSec = get_option_int(name{"entryarchsec"});
-         print("archiveEntries 4 \n");
+
          int limitIndex = 0;
-         auto entryItr = entriesByContest.begin();
-         print("archiveEntries 5 \n");
-         while(entryItr != entriesByContest.end() && limitIndex < 500 && entryItr->createdAt <= now - archSec) {
-            print("archive entry", entryItr->id, "\n");
-            auto voteItr = votesByEntry.lower_bound(entryItr->id.value);
-            while(voteItr != votesByEntry.end() && limitIndex < 500 && voteItr->entryId == entryItr->id) {
-               voteItr = votesByEntry.erase(voteItr);
-               limitIndex++;
+         auto contestItr = contestsByEndtime.begin();
+         while(contestItr != contestsByEndtime.end() && limitIndex < 500 && contestItr->createdAt <= now - archSec) {
+            print("archiving contest ", contestItr->id, "\n");
+            auto entryItr = entriesByContest.lower_bound(contestItr->id);
+
+            while(entryItr != entriesByContest.end() && limitIndex < 500) {
+               print("archiving entry ", entryItr->id, "\n");
+
+               auto voteItr = votesByEntry.lower_bound(entryItr->id.value);
+               while(voteItr != votesByEntry.end() && limitIndex < 500 && voteItr->entryId == entryItr->id) {
+                  print("archive vote ", voteItr->id, "\n");
+                  voteItr = votesByEntry.erase(voteItr);
+                  limitIndex++;
+               }
+
+               if (limitIndex < 500) {
+                  print("archive entry ", entryItr->id, "\n");
+                  entryItr = entriesByContest.erase(entryItr);
+                  limitIndex++;
+               }
             }
 
             if (limitIndex < 500) {
-               entryItr = entriesByContest.erase(entryItr);
+               print("archive contest ", contestItr->id, "\n");
+               contestItr = contestsByEndtime.erase(contestItr);
+               limitIndex++;
+            }
+         }
+
+         auto entryItr2 = entriesByCreatedAt.begin();
+         while(entryItr2 != entriesByCreatedAt.end() && limitIndex < 500 && entryItr2->createdAt <= now - archSec) {
+            if (entryItr2->contestId == 0) {
+               print("archive entry without contest ", entryItr2->id, "\n");
+               entryItr2 = entriesByCreatedAt.erase(entryItr2);
                limitIndex++;
             }
          }

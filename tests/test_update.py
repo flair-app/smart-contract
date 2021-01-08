@@ -634,13 +634,32 @@ class UpdateActionsUnitTest(unittest.TestCase):
             permission=(self.BOB, Permission.ACTIVE)
         )
 
+        HOST.table("contests", HOST)
+        HOST.table("entries", HOST)
+
         time.sleep(5)
 
         HOST.push_action("update", force_unique=True, permission=(HOST, Permission.ACTIVE)) 
+        HOST.table("contests", HOST)
+        HOST.table("entries", HOST)
 
         entriesRes = HOST.table("entries", HOST, lower=self.entryId, key_type="name")
-        print(entriesRes)
-        self.assertEqual(len(entriesRes.json["rows"]), 0)
+        try:
+            self.assertNotEqual(entriesRes.json["rows"][0]['id'], self.entryId)
+        except IndexError:
+            pass
+
+        entriesRes = HOST.table("entries", HOST, lower=self.entryId2, key_type="name")
+        try:
+            self.assertNotEqual(entriesRes.json["rows"][0]['id'], self.entryId2)
+        except IndexError:
+            pass
+
+        entriesRes = HOST.table("entries", HOST, lower=self.entryId3, key_type="name")
+        try:
+            self.assertNotEqual(entriesRes.json["rows"][0]['id'], self.entryId3)
+        except IndexError:
+            pass
 
     def test_update_action_sends_fixed_prize_winnings_to_winner_and_flair_only_once(self):
         SCENARIO("test_update_action_sends_winnings_to_winner_and_flair_only_once")
