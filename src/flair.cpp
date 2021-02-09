@@ -353,8 +353,7 @@ class [[eosio::contract("flair")]] flair : public contract {
             auto contestItr = contests.find(itr->contestId);
             if (contestItr != contests.end()) {
                uint32_t now = eosio::current_time_point().sec_since_epoch();
-               auto contestEndTime = (safeint{contestItr->createdAt} + safeint{contestItr->submissionPeriod} + safeint{contestItr->votePeriod}).amount;
-               check(now > contestEndTime, "entryId: " + params.id.to_string() + ", You've already entered this contest. You can only submit one entry per contest.");
+               check(now > contestItr->endtime(), "entryId: " + params.id.to_string() + ", You've already entered this contest. You can only submit one entry per contest.");
 
                byUserIdAndLevelIdIdx.modify(itr, _self, [&](contestEntry& row) {
                   row.open = false;
@@ -556,8 +555,8 @@ class [[eosio::contract("flair")]] flair : public contract {
          print("distributeContestWinnings completed \n");
          checkUnavailablePriceEntries();
          print("checkUnavailablePriceEntries completed \n");
-         archiveEntries();
-         print("archiveEntries completed \n");
+         // archiveEntries();
+         // print("archiveEntries completed \n");
       }
 
       [[eosio::action]]
@@ -1115,7 +1114,7 @@ class [[eosio::contract("flair")]] flair : public contract {
             curContestItr != byLevelIdx.end()
             && curContestItr->levelId == entryItr->levelId
             && curContestItr->participantCount < curContestItr->participantLimit
-            && now <= (safeint{curContestItr->createdAt} + safeint{curContestItr->submissionPeriod}).amount
+            && now <= curContestItr->votestarttime()
          );
          print("ae: test1");
          if (curContestValid) {
