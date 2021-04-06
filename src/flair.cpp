@@ -516,6 +516,85 @@ class [[eosio::contract("flair")]] flair : public contract {
       }
 
       /*
+         Claim
+      */
+      [[eosio::action]]
+      void claim(name profileId, asset amount, name to, std::string memo) {
+         profile_index profiles(_self, _self.value);
+         auto profileItr = profiles.find(profileId.value);
+         check(profileItr->id == profileId, "Cannot find profile");
+         require_auth(profileItr->account);
+         check(profileItr->winnings.amount >= amount.amount, "Amount greater than prize winnings");
+
+         profiles.modify(profileItr, _self, [&](profile& row) {
+            row.winnings = row.winnings - amount;
+         });
+
+         action{
+            permission_level{get_self(), name("active")},
+            name("eosio.token"),
+            name("transfer"),
+            std::make_tuple(get_self(), to, amount, memo)
+         }.send();
+      }
+
+      /*
+         Claim USD
+      */
+      [[eosio::action]]
+      void claimusd(name profileId, name claimId, asset amount) {
+         profile_index profiles(_self, _self.value);
+         auto profileItr = profiles.find(profileId.value);
+         check(profileItr->id == profileId, "Cannot find profile");
+         require_auth(profileItr->account);
+         check(profileItr->winnings.amount >= amount.amount, "Amount greater than prize winnings");
+
+         profiles.modify(profileItr, _self, [&](profile& row) {
+            row.winnings = row.winnings - amount;
+         });
+
+         std::string claimusdacct = get_option(name{"claimusdacct"});
+         std::string claimusdmemo = get_option(name{"claimusdmemo"});
+
+         openclaim_index openclaims(_self, _self.value);
+         openclaims.emplace(_self, [&](openclaim& row) {
+            row.id = claimId;
+            row.profileId = profileId;
+            row.to = name{claimusdacct};
+            row.toMemo = claimusdmemo;
+            row.amount = amount;
+         });
+
+         action{
+            permission_level{get_self(), name("active")},
+            name("eosio.token"),
+            name("transfer"),
+            std::make_tuple(get_self(), name{claimusdacct}, amount, claimusdmemo)
+         }.send();
+      }
+
+      /*
+         Claim USD
+      */
+      [[eosio::action]]
+      void deleteclaim(name claimId) {
+         require_auth( _self );
+         openclaim_index openclaims(_self, _self.value);
+         auto openclaim = openclaims.find(claimId.value);
+         openclaims.erase(openclaim);
+      }
+
+      /*
+         Set Fee Account
+      */
+      [[eosio::action]]
+      void setclaimacct(name account, std::string memo) {
+         require_auth( _self );
+         set_option(name{"claimusdacct"}, account.to_string());
+         set_option(name{"claimusdmemo"}, memo);
+      }
+
+      /*
          Set Fee Account
       */
       [[eosio::action]]
@@ -614,6 +693,7 @@ class [[eosio::contract("flair")]] flair : public contract {
          std::string bio;
          name account;
          bool active;
+         asset winnings;
 
          uint64_t primary_key() const { return id.value; }
          checksum256 by_username_hash() const { return usernameHash; }
@@ -624,6 +704,24 @@ class [[eosio::contract("flair")]] flair : public contract {
          profile,
          indexed_by<name("byusername"), const_mem_fun<profile, checksum256, &profile::by_username_hash>>
       > profile_index;
+
+      /*
+         TABLE: openclaims
+      */
+      struct [[eosio::table]] openclaim {
+         name id;
+         name profileId;
+         name to;
+         std::string toMemo;
+         asset amount;
+
+         uint64_t primary_key() const { return id.value; }
+      };
+
+      typedef eosio::multi_index<
+         name("openclaims"), 
+         openclaim
+      > openclaim_index;
 
       /*
          TABLE: options
@@ -877,12 +975,13 @@ class [[eosio::contract("flair")]] flair : public contract {
                      print("sending to winner: ", profileItr->account, ", amt: ", winnerPrize, ", memo: ", contestItr->id, "\n");
 
                      if (winnerPrize.amount > 0) { 
-                        action{
-                           permission_level{get_self(), name("active")},
-                           name("eosio.token"),
-                           name("transfer"),
-                           std::make_tuple(get_self(), profileItr->account, winnerPrize, std::to_string(contestItr->id))
-                        }.send();
+                        profiles.modify(profileItr, _self, [&](profile& row) {
+                           if (row.winnings.amount > 0) {
+                              row.winnings = row.winnings + winnerPrize;
+                           } else {
+                              row.winnings = winnerPrize;
+                           }
+                        });
                      }
                   }
 

@@ -110,6 +110,7 @@ class UpdateActionsUnitTest(unittest.TestCase):
         time.sleep(1) # prevent non unique error for timestamps in eos prices
         
         self.FEEACCT = self.createRandomGlobalUser("user_feeacct_")
+        self.CLAIMACCT = self.createRandomGlobalUser("claimacct_")
         self.ALICE = self.createRandomGlobalUser("user_alice_")
         self.BOB = self.createRandomGlobalUser("user_bob_")
         self.CAROL = self.createRandomGlobalUser("user_carol_")
@@ -212,6 +213,15 @@ class UpdateActionsUnitTest(unittest.TestCase):
             {
                 "account":self.FEEACCT,
                 "memo":"my memo",
+            }, 
+            permission=(HOST, Permission.ACTIVE)
+        )
+
+        HOST.push_action(
+            "setclaimacct", 
+            {
+                "account": self.CLAIMACCT,
+                "memo":"claim memo",
             }, 
             permission=(HOST, Permission.ACTIVE)
         )
@@ -344,8 +354,8 @@ class UpdateActionsUnitTest(unittest.TestCase):
             permission=(self.CAROL, Permission.ACTIVE)
         )
 
-    def test_update_action_sends_winnings_to_winner_and_flair_only_once(self):
-        SCENARIO("test_update_action_sends_winnings_to_winner_and_flair_only_once")
+    def test_claim_sends_funds_and_reduces_profile_winnings(self):
+        SCENARIO("test_claim_sends_funds_and_reduces_profile_winnings")
         TOKENHOST.push_action(
             "transfer",
             {
@@ -412,26 +422,28 @@ class UpdateActionsUnitTest(unittest.TestCase):
         )
 
         time.sleep(4)
-        
-        feeBeforeBal = float(self.getEOSBalance(self.FEEACCT))
-        aliceBeforeBal = extract_profile_winnings(HOST.table("profiles", HOST, lower=self.userId, key_type="name").json["rows"])
-        bobBeforeBal = extract_profile_winnings(HOST.table("profiles", HOST, lower=self.userId2, key_type="name").json["rows"])
-
-        HOST.table("contests", HOST)
 
         HOST.push_action("update", force_unique=True, permission=(HOST, Permission.ACTIVE))
-        HOST.push_action("update", force_unique=True, permission=(HOST, Permission.ACTIVE))
 
-        feeAfterBal = float(self.getEOSBalance(self.FEEACCT))
-        aliceAfterBal = extract_profile_winnings(HOST.table("profiles", HOST, lower=self.userId, key_type="name").json["rows"])
-        bobAfterBal = extract_profile_winnings(HOST.table("profiles", HOST, lower=self.userId2, key_type="name").json["rows"])
-        
-        self.assertAlmostEqual(feeAfterBal - feeBeforeBal, 0.27)
-        self.assertAlmostEqual(aliceAfterBal - aliceBeforeBal, 1.719)
-        self.assertAlmostEqual(bobAfterBal - bobBeforeBal, 4.011)
+        beforeBal = float(self.getEOSBalance(self.BOB))
+        profileBeforeBal = extract_profile_winnings(HOST.table("profiles", HOST, lower=self.userId2, key_type="name").json["rows"])
+        HOST.push_action(
+            "claim",
+            {
+                "profileId": self.userId2,
+                "amount": "4.0110 EOS",
+                "to": str(self.BOB),
+                "memo": "test",
+            },
+            permission=(self.BOB, Permission.ACTIVE)
+        )
+        afterBal = float(self.getEOSBalance(self.BOB))
+        profileAfterBal = extract_profile_winnings(HOST.table("profiles", HOST, lower=self.userId2, key_type="name").json["rows"])
+        self.assertAlmostEqual(afterBal - beforeBal, 4.011)
+        self.assertAlmostEqual(profileBeforeBal - profileAfterBal, 4.011)
 
-    def test_update_action_sends_winnings_to_winners_when_tied_and_flair_only_once(self):
-        SCENARIO("test_update_action_sends_winnings_to_winners_when_tied_and_flair_only_once")
+    def test_claim_requires_user_auth(self):
+        SCENARIO("test_claim_requires_user_auth")
         TOKENHOST.push_action(
             "transfer",
             {
@@ -456,287 +468,24 @@ class UpdateActionsUnitTest(unittest.TestCase):
             permission=(self.BOB, Permission.ACTIVE)
         )
 
-        time.sleep(5)    
-
-        HOST.push_action(
-            "vote",
+        TOKENHOST.push_action(
+            "transfer",
             {
-                "entryId": self.entryId2,
-                "voterUserId": self.userId3,
+                "from": self.CAROL,
+                "to": HOST,
+                "quantity": "2.0000 EOS", 
+                "memo": self.entryId3,
             },
+            force_unique=True,
             permission=(self.CAROL, Permission.ACTIVE)
         )
+
+        time.sleep(5)    
 
         HOST.push_action(
             "vote",
             {
                 "entryId": self.entryId,
-                "voterUserId": self.userId4,
-            },
-            permission=(self.ELLIOT, Permission.ACTIVE)
-        )
-
-        time.sleep(4)
-        
-        feeBeforeBal = float(self.getEOSBalance(self.FEEACCT))
-        aliceBeforeBal = extract_profile_winnings(HOST.table("profiles", HOST, lower=self.userId, key_type="name").json["rows"])
-        bobBeforeBal = extract_profile_winnings(HOST.table("profiles", HOST, lower=self.userId2, key_type="name").json["rows"])
-
-        HOST.table("contests", HOST)
-
-        HOST.push_action("update", force_unique=True, permission=(HOST, Permission.ACTIVE))
-        HOST.push_action("update", force_unique=True, permission=(HOST, Permission.ACTIVE))
-
-        feeAfterBal = float(self.getEOSBalance(self.FEEACCT))
-        aliceAfterBal = extract_profile_winnings(HOST.table("profiles", HOST, lower=self.userId, key_type="name").json["rows"])
-        bobAfterBal = extract_profile_winnings(HOST.table("profiles", HOST, lower=self.userId2, key_type="name").json["rows"])
-        
-        self.assertAlmostEqual(bobAfterBal - bobBeforeBal, 1.91)
-        self.assertAlmostEqual(aliceAfterBal - aliceBeforeBal, 1.91)
-        self.assertAlmostEqual(feeAfterBal - feeBeforeBal, 0.18)
-
-    def test_update_action_doesnt_send_winnings_before_contest_ends(self):
-        SCENARIO("test_update_action_doesnt_send_winnings_before_contest_ends")
-        TOKENHOST.push_action(
-            "transfer",
-            {
-                "from": self.ALICE,
-                "to": HOST,
-                "quantity": "2.0000 EOS", 
-                "memo": self.entryId,
-            },
-            force_unique=True,
-            permission=(self.ALICE, Permission.ACTIVE)
-        )
-
-        TOKENHOST.push_action(
-            "transfer",
-            {
-                "from": self.BOB,
-                "to": HOST,
-                "quantity": "2.0000 EOS", 
-                "memo": self.entryId2,
-            },
-            force_unique=True,
-            permission=(self.BOB, Permission.ACTIVE)
-        )
-
-        time.sleep(5)    
-
-        HOST.push_action(
-            "vote",
-            {
-                "entryId": self.entryId2,
-                "voterUserId": self.userId3,
-            },
-            permission=(self.CAROL, Permission.ACTIVE)
-        )
-        
-        feeBeforeBal = float(self.getEOSBalance(self.FEEACCT))
-        bobBeforeBal = extract_profile_winnings(HOST.table("profiles", HOST, lower=self.userId2, key_type="name").json["rows"])
-
-        HOST.table("contests", HOST)
-
-        HOST.push_action("update", force_unique=True, permission=(HOST, Permission.ACTIVE))
-        HOST.push_action("update", force_unique=True, permission=(HOST, Permission.ACTIVE))
-
-        feeAfterBal = float(self.getEOSBalance(self.FEEACCT))
-        bobAfterBal = extract_profile_winnings(HOST.table("profiles", HOST, lower=self.userId2, key_type="name").json["rows"])
-        
-        self.assertAlmostEqual(feeAfterBal, feeBeforeBal)
-        self.assertAlmostEqual(bobAfterBal, bobBeforeBal)
-
-        # go ahead payout now to prevent from having side effects on later tests. 
-        time.sleep(5)
-        HOST.push_action("update", force_unique=True, permission=(HOST, Permission.ACTIVE))
-
-    def test_update_action_activates_priceUnavailable_entries_that_have_prices(self):
-        #set entry exp forward from price freshness to ensure price freshness check
-        HOST.push_action(
-            "setentryexp",
-            [2000],
-            permission=(HOST, Permission.ACTIVE),
-            force_unique=1
-        )
-
-        HOST.push_action(
-            "setpricefrsh",
-            [1],
-            permission=(HOST, Permission.ACTIVE),
-            force_unique=1
-        )
-
-        time.sleep(5)
-
-        TOKENHOST.push_action(
-            "transfer",
-            {
-                "from": self.ALICE,
-                "to": HOST,
-                "quantity": "2.0000 EOS",
-                "memo": self.entryId,
-            },
-            force_unique=True,
-            permission=(self.ALICE, Permission.ACTIVE)
-        )
-
-        HOST.push_action(
-            "addcurhigh",
-            {
-                "openTime": int(time.time()),
-                "usdHigh": 50000, # $5.0000
-                "intervalSec": 2, # 2 seconds
-            },
-            permission=(HOST, Permission.ACTIVE),
-            force_unique=1
-        )
-        HOST.push_action("update", force_unique=True, permission=(HOST, Permission.ACTIVE))
-
-        entriesRes = HOST.table("entries", HOST, lower=self.entryId, key_type="name")
-        print(entriesRes)
-        entry = entriesRes.json["rows"][0]
-        self.assertEqual(entry["id"], self.entryId)
-        self.assertEqual(entry["priceUnavailable"], 0)
-        self.assertEqual(entry["amount"], 20000)
-        contestId = entry["contestId"]
-        self.assertGreater(contestId, 0)
-
-        # go ahead payout now to prevent from having side effects on later tests. 
-        time.sleep(5)
-        HOST.push_action("update", force_unique=True, permission=(HOST, Permission.ACTIVE))
-
-    def test_update_action_archives_entries(self):
-        return
-        HOST.push_action(
-            "setentryarch",
-            [5],
-            permission=(HOST, Permission.ACTIVE),
-            force_unique=1
-        )
-
-        TOKENHOST.push_action(
-            "transfer",
-            {
-                "from": self.ALICE,
-                "to": HOST,
-                "quantity": "2.0000 EOS", 
-                "memo": self.entryId,
-            },
-            force_unique=True,
-            permission=(self.ALICE, Permission.ACTIVE)
-        )
-
-        TOKENHOST.push_action(
-            "transfer",
-            {
-                "from": self.BOB,
-                "to": HOST,
-                "quantity": "2.0000 EOS", 
-                "memo": self.entryId2,
-            },
-            force_unique=True,
-            permission=(self.BOB, Permission.ACTIVE)
-        )
-
-        HOST.table("contests", HOST)
-        HOST.table("entries", HOST)
-
-        time.sleep(5)
-
-        HOST.push_action("update", force_unique=True, permission=(HOST, Permission.ACTIVE)) 
-        HOST.table("contests", HOST)
-        HOST.table("entries", HOST)
-
-        entriesRes = HOST.table("entries", HOST, lower=self.entryId, key_type="name")
-        try:
-            self.assertNotEqual(entriesRes.json["rows"][0]['id'], self.entryId)
-        except IndexError:
-            pass
-
-        entriesRes = HOST.table("entries", HOST, lower=self.entryId2, key_type="name")
-        try:
-            self.assertNotEqual(entriesRes.json["rows"][0]['id'], self.entryId2)
-        except IndexError:
-            pass
-
-        entriesRes = HOST.table("entries", HOST, lower=self.entryId3, key_type="name")
-        try:
-            self.assertNotEqual(entriesRes.json["rows"][0]['id'], self.entryId3)
-        except IndexError:
-            pass
-
-    def test_update_action_sends_fixed_prize_winnings_to_winner_and_flair_only_once(self):
-        return
-        SCENARIO("test_update_action_sends_winnings_to_winner_and_flair_only_once")
-
-        print("test \n")
-        TOKENHOST.push_action(
-            "transfer",
-            {
-                "from": self.ALICE,
-                "to": HOST,
-                "quantity": "2.0000 EOS", 
-                "memo": "prizefund",
-            },
-            force_unique=True,
-            permission=(self.ALICE, Permission.ACTIVE)
-        )
-        print("test 2 \n")
-        self.entryId4 = self.randomEOSIOId()
-        HOST.push_action(
-            "entercontest",
-            [{
-                "id": self.entryId4,
-                "userId": self.userId,
-                "levelId": self.levelId2,
-                "videoHash360p": self.videoHash360p,
-                "videoHash480p": self.videoHash480p,
-                "videoHash720p": self.videoHash720p,
-                "videoHash1080p": self.videoHash1080p,
-                "coverHash": self.coverHash,
-            }],
-            permission=(self.ALICE, Permission.ACTIVE)
-        )
-        print("test 3 \n")
-
-        self.entryId5 = self.randomEOSIOId()
-        HOST.push_action(
-            "entercontest",
-            [{
-                "id": self.entryId5,
-                "userId": self.userId2,
-                "levelId": self.levelId2,
-                "videoHash360p": self.videoHash360p,
-                "videoHash480p": self.videoHash480p,
-                "videoHash720p": self.videoHash720p,
-                "videoHash1080p": self.videoHash1080p,
-                "coverHash": self.coverHash,
-            }],
-            permission=(self.BOB, Permission.ACTIVE)
-        )
-
-        self.entryId6 = self.randomEOSIOId()
-        HOST.push_action(
-            "entercontest",
-            [{
-                "id": self.entryId6,
-                "userId": self.userId3,
-                "levelId": self.levelId2,
-                "videoHash360p": self.videoHash360p,
-                "videoHash480p": self.videoHash480p,
-                "videoHash720p": self.videoHash720p,
-                "videoHash1080p": self.videoHash1080p,
-                "coverHash": self.coverHash,
-            }],
-            permission=(self.CAROL, Permission.ACTIVE)
-        )
-
-        time.sleep(5)    
-
-        HOST.push_action(
-            "vote",
-            {
-                "entryId": self.entryId4,
                 "voterUserId": self.userId,
             },
             permission=(self.ALICE, Permission.ACTIVE)
@@ -745,7 +494,7 @@ class UpdateActionsUnitTest(unittest.TestCase):
         HOST.push_action(
             "vote",
             {
-                "entryId": self.entryId5,
+                "entryId": self.entryId2,
                 "voterUserId": self.userId2,
             },
             permission=(self.BOB, Permission.ACTIVE)
@@ -754,7 +503,7 @@ class UpdateActionsUnitTest(unittest.TestCase):
         HOST.push_action(
             "vote",
             {
-                "entryId": self.entryId5,
+                "entryId": self.entryId2,
                 "voterUserId": self.userId3,
             },
             permission=(self.CAROL, Permission.ACTIVE)
@@ -762,37 +511,204 @@ class UpdateActionsUnitTest(unittest.TestCase):
 
         time.sleep(4)
 
-        HOST.push_action(
-            "addcurhigh",
+        HOST.push_action("update", force_unique=True, permission=(HOST, Permission.ACTIVE))
+
+        with self.assertRaises(MissingRequiredAuthorityError):
+            HOST.push_action(
+                "claim",
+                {
+                    "profileId": self.userId2,
+                    "amount": "4.0110 EOS",
+                    "to": str(self.BOB),
+                    "memo": "test",
+                },
+                permission=(self.ALICE, Permission.ACTIVE)
+            )
+
+    def test_claimusd_sends_funds_and_reduces_profile_winnings_and_creates_openclaim(self):
+        SCENARIO("test_claimusd_sends_funds_and_reduces_profile_winnings_and_creates_openclaim")
+        TOKENHOST.push_action(
+            "transfer",
             {
-                "openTime": int(time.time()),
-                "usdHigh": 50000, # $5.0000
-                "intervalSec": 2, # 2 seconds
+                "from": self.ALICE,
+                "to": HOST,
+                "quantity": "2.0000 EOS", 
+                "memo": self.entryId,
             },
-            permission=(HOST, Permission.ACTIVE),
-            force_unique=1
+            force_unique=True,
+            permission=(self.ALICE, Permission.ACTIVE)
         )
-        
-        feeBeforeBal = float(self.getEOSBalance(self.FEEACCT))
-        aliceBeforeBal = extract_profile_winnings(HOST.table("profiles", HOST, lower=self.userId, key_type="name").json["rows"])
-        bobBeforeBal = extract_profile_winnings(HOST.table("profiles", HOST, lower=self.userId2, key_type="name").json["rows"])
 
+        TOKENHOST.push_action(
+            "transfer",
+            {
+                "from": self.BOB,
+                "to": HOST,
+                "quantity": "2.0000 EOS", 
+                "memo": self.entryId2,
+            },
+            force_unique=True,
+            permission=(self.BOB, Permission.ACTIVE)
+        )
 
-        HOST.table("contests", HOST)
+        TOKENHOST.push_action(
+            "transfer",
+            {
+                "from": self.CAROL,
+                "to": HOST,
+                "quantity": "2.0000 EOS", 
+                "memo": self.entryId3,
+            },
+            force_unique=True,
+            permission=(self.CAROL, Permission.ACTIVE)
+        )
+
+        time.sleep(5)    
+
+        HOST.push_action(
+            "vote",
+            {
+                "entryId": self.entryId,
+                "voterUserId": self.userId,
+            },
+            permission=(self.ALICE, Permission.ACTIVE)
+        )
+
+        HOST.push_action(
+            "vote",
+            {
+                "entryId": self.entryId2,
+                "voterUserId": self.userId2,
+            },
+            permission=(self.BOB, Permission.ACTIVE)
+        )
+
+        HOST.push_action(
+            "vote",
+            {
+                "entryId": self.entryId2,
+                "voterUserId": self.userId3,
+            },
+            permission=(self.CAROL, Permission.ACTIVE)
+        )
+
+        time.sleep(4)
 
         HOST.push_action("update", force_unique=True, permission=(HOST, Permission.ACTIVE))
+
+        destBeforeBal = float(self.getEOSBalance(self.CLAIMACCT))
+        profileBeforeBal = extract_profile_winnings(HOST.table("profiles", HOST, lower=self.userId2, key_type="name").json["rows"])
+
+        claimId = self.randomEOSIOId()
+        HOST.push_action(
+            "claimusd",
+            {
+                "profileId": self.userId2,
+                "claimId": claimId,
+                "amount": "4.0110 EOS"
+            },
+            permission=(self.BOB, Permission.ACTIVE)
+        )
+        destAfterBal = float(self.getEOSBalance(self.CLAIMACCT))
+        profileAfterBal = extract_profile_winnings(HOST.table("profiles", HOST, lower=self.userId2, key_type="name").json["rows"])
+        self.assertAlmostEqual(destAfterBal - destBeforeBal, 4.011)
+        self.assertAlmostEqual(profileBeforeBal - profileAfterBal, 4.011)
+
+        claim = HOST.table("openclaims", HOST, lower=claimId, key_type="name").json["rows"][0]
+        self.assertEqual(claim["id"], claimId)
+
+        HOST.push_action(
+            "deleteclaim",
+            {
+                "claimId": claimId,
+            },
+            permission=(HOST, Permission.ACTIVE)
+        )
+
+        self.assertEqual(len(HOST.table("openclaims", HOST, lower=claimId, key_type="name").json["rows"]), 0)
+
+    def test_claimusd_requires_user_auth(self):
+        SCENARIO("test_claimusd_requires_user_auth")
+        TOKENHOST.push_action(
+            "transfer",
+            {
+                "from": self.ALICE,
+                "to": HOST,
+                "quantity": "2.0000 EOS", 
+                "memo": self.entryId,
+            },
+            force_unique=True,
+            permission=(self.ALICE, Permission.ACTIVE)
+        )
+
+        TOKENHOST.push_action(
+            "transfer",
+            {
+                "from": self.BOB,
+                "to": HOST,
+                "quantity": "2.0000 EOS", 
+                "memo": self.entryId2,
+            },
+            force_unique=True,
+            permission=(self.BOB, Permission.ACTIVE)
+        )
+
+        TOKENHOST.push_action(
+            "transfer",
+            {
+                "from": self.CAROL,
+                "to": HOST,
+                "quantity": "2.0000 EOS", 
+                "memo": self.entryId3,
+            },
+            force_unique=True,
+            permission=(self.CAROL, Permission.ACTIVE)
+        )
+
+        time.sleep(5)    
+
+        HOST.push_action(
+            "vote",
+            {
+                "entryId": self.entryId,
+                "voterUserId": self.userId,
+            },
+            permission=(self.ALICE, Permission.ACTIVE)
+        )
+
+        HOST.push_action(
+            "vote",
+            {
+                "entryId": self.entryId2,
+                "voterUserId": self.userId2,
+            },
+            permission=(self.BOB, Permission.ACTIVE)
+        )
+
+        HOST.push_action(
+            "vote",
+            {
+                "entryId": self.entryId2,
+                "voterUserId": self.userId3,
+            },
+            permission=(self.CAROL, Permission.ACTIVE)
+        )
+
+        time.sleep(4)
+
         HOST.push_action("update", force_unique=True, permission=(HOST, Permission.ACTIVE))
 
-        feeAfterBal = float(self.getEOSBalance(self.FEEACCT))
-        aliceAfterBal = extract_profile_winnings(HOST.table("profiles", HOST, lower=self.userId, key_type="name").json["rows"])
-        bobAfterBal = extract_profile_winnings(HOST.table("profiles", HOST, lower=self.userId2, key_type="name").json["rows"])
-
-        
-        self.assertAlmostEqual(feeAfterBal - feeBeforeBal, 0.0)
-        self.assertAlmostEqual(aliceAfterBal - aliceBeforeBal, 0.0)
-        self.assertAlmostEqual(bobAfterBal - bobBeforeBal, 2.0)
-
-        HOST.table("options", HOST)
+        with self.assertRaises(MissingRequiredAuthorityError):
+            claimId = self.randomEOSIOId()
+            HOST.push_action(
+                "claimusd",
+                {
+                    "profileId": self.userId2,
+                    "claimId": claimId,
+                    "amount": "4.0110 EOS"
+                },
+                permission=(self.ALICE, Permission.ACTIVE)
+            )
 
     @classmethod
     def tearDownClass(cls):
