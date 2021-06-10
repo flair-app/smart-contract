@@ -353,7 +353,7 @@ class [[eosio::contract("flair")]] flair : public contract {
             auto contestItr = contests.find(itr->contestId);
             if (contestItr != contests.end()) {
                uint32_t now = eosio::current_time_point().sec_since_epoch();
-               check(now > contestItr->endtime(), "entryId: " + params.id.to_string() + ", You've already entered this contest. You can only submit one entry per contest.");
+               check(now > contestItr->votestarttime(), "You've already entered this contest. You can only submit one entry per contest. (entryId: " + params.id.to_string() + ")");
 
                byUserIdAndLevelIdIdx.modify(itr, _self, [&](contestEntry& row) {
                   row.open = false;
