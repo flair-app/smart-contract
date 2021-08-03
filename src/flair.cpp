@@ -491,7 +491,7 @@ class [[eosio::contract("flair")]] flair : public contract {
 
          symbol s(get_option(name{'currency'}), 4);
 
-         if (!entryItr->prizeRevoked && entryItr->prizeGiven > asset{0, s}) {
+         if (!entryItr->prizeRevoked && entryItr->prizeGiven.amount > 0 && entryItr->prizeGiven > asset{0, s}) {
             profile_index profiles(_self, _self.value);
             auto profileItr = profiles.find(entryItr->userId.value);
 
