@@ -462,6 +462,78 @@ class [[eosio::contract("flair")]] flair : public contract {
       }
 
       /*
+         Block Entry
+      */
+      [[eosio::action]]
+      void blkentry(name id) {
+         require_auth(_self);
+
+         entries_index entries(_self, _self.value);
+         auto entryItr = entries.find(id.value);
+
+         check(entryItr->contestId > 0, "Cannot block an entry that is not in a contest.");
+         check(entryItr->block == 0, "Entry is already blocked.");
+
+         contest_index contests(_self, _self.value);
+         auto contestItr = contests.find(entryItr->contestId);
+
+         uint32_t now = eosio::current_time_point().sec_since_epoch();
+         bool contestEnded = now > contestItr->endtime();
+         std::tuple<std::list<std::tuple<uint64_t, asset>>, asset> oldWinnerResults;
+
+         entries.modify(entryItr, _self, [&](contestEntry& row) {
+            row.block = 1;
+         });
+
+         contests.modify(contestItr, _self, [&](contest& row) {
+            row.participantCount--;
+         });
+
+         symbol s(get_option(name{'currency'}), 4);
+
+         if (!entryItr->prizeRevoked && entryItr->prizeGiven > asset{0, s}) {
+            profile_index profiles(_self, _self.value);
+            auto profileItr = profiles.find(entryItr->userId.value);
+
+            if (profileItr->winnings >= entryItr->prizeGiven) { 
+               profiles.modify(profileItr, _self, [&](profile& row) {
+                  row.winnings = row.winnings - entryItr->prizeGiven;
+               });
+
+               entries.modify(entryItr, _self, [&](contestEntry& row) {
+                  row.prizeRevoked = 1;
+               });
+            }          
+         }
+         
+      }
+
+     /*
+         Unblock Entry
+      */
+      void unblkentry(name id) {
+         require_auth(_self);
+         
+         entries_index entries(_self, _self.value);
+         auto entryItr = entries.find(id.value);
+
+         check(entryItr->contestId > 0, "Cannot unblock an entry that is not in a contest");
+         check(entryItr->block == 1, "Cannot unblock an entry that is not blocked.");
+
+         contest_index contests(_self, _self.value);
+         auto contestItr = contests.find(entryItr->contestId);
+
+
+         entries.modify(entryItr, _self, [&](contestEntry& row) {
+            row.block = 0;
+         });
+
+         contests.modify(contestItr, _self, [&](contest& row) {
+            row.participantCount++;
+         });
+      }
+
+      /*
          Vote
       */
       [[eosio::action]]
@@ -524,6 +596,7 @@ class [[eosio::contract("flair")]] flair : public contract {
          auto profileItr = profiles.find(profileId.value);
          check(profileItr->id == profileId, "Cannot find profile");
          require_auth(profileItr->account);
+         check(profileItr->active, "Profile must be active to claim winnings");
          check(profileItr->winnings.amount >= amount.amount, "Amount greater than prize winnings");
 
          profiles.modify(profileItr, _self, [&](profile& row) {
@@ -547,6 +620,7 @@ class [[eosio::contract("flair")]] flair : public contract {
          auto profileItr = profiles.find(profileId.value);
          check(profileItr->id == profileId, "Cannot find profile");
          require_auth(profileItr->account);
+         check(profileItr->active, "Profile must be active to claim winnings");
          check(profileItr->winnings.amount >= amount.amount, "Amount greater than prize winnings");
 
          profiles.modify(profileItr, _self, [&](profile& row) {
@@ -763,6 +837,9 @@ class [[eosio::contract("flair")]] flair : public contract {
          uint64_t amount;
          bool priceUnavailable;
          bool open;
+         bool block;
+         bool prizeRevoked;
+         asset prizeGiven;
          checksum256 videoHash720p;
          checksum256 videoHash1080p;
          checksum256 coverHash;
@@ -891,126 +968,156 @@ class [[eosio::contract("flair")]] flair : public contract {
 
          bool hitBeginning = false;
          while(!hitBeginning && contestItr->paid == false) {
-            print("contest id: ", contestItr->id, "\n");
+            auto winnerResults = getContestWinners<decltype(contestItr)>(contestItr);
+            auto winnersArr = std::get<0>(winnerResults);
+            auto prizeRemainder = std::get<1>(winnerResults);
 
-            entries_index entries(_self, _self.value);
-            auto entriesByContest = entries.get_index<name("bycontest")>();
-            auto contestEntriesItr = entriesByContest.lower_bound(contestItr->id);
-            level_index levels(_self, _self.value);
-            auto levelItr = levels.find(contestItr->levelId.value);
+            for (auto const& winnerTuple : winnersArr) {
+               auto winner = std::get<0>(winnerTuple);
+               auto entryId = std::get<1>(winnerTuple);
+               auto winnerPrize = std::get<2>(winnerTuple);
 
-            symbol s(get_option(name{'currency'}), 4);
-
-            asset contestPrize(0, s);
-            std::map<uint64_t, std::list<uint64_t>> winners;
-            uint64_t votes = 0;
-
-            if (contestItr->fixedPrize > 0) {
-               contestPrize = asset{contestItr->fixedPrize, s};
-            }
-
-            // sum amount of all entry within contest & find winner(s)
-            for (auto entryItr = contestEntriesItr; entryItr->contestId == contestItr->id && entryItr != entriesByContest.end(); entryItr++) {
-               print("user: ", entryItr->userId, " votes: ", entryItr->votes, " amount: ", entryItr->amount, "\n");
-               if (contestItr->fixedPrize == 0) {
-                  contestPrize += asset(entryItr->amount, s);
-               }
-               std::list<uint64_t> winnersByVotes; 
-               if(winners.find(entryItr->votes) != winners.end()) {
-                  winnersByVotes = winners[entryItr->votes];
-                  winnersByVotes.push_back(entryItr->userId.value);
-               } else {
-                  winnersByVotes = {entryItr->userId.value};
-               }
-               winners[entryItr->votes] = winnersByVotes;
-            }
-
-            print("level fee: ", levelItr->fee, "\n");
-            check(levelItr->fee < 1000, "interval error: fee is too large, must be below 100%");
-            asset feeAmount = contestPrize * levelItr->fee / 1000;
-            if (contestItr->fixedPrize > 0) {
-               feeAmount.set_amount(0);
-            }
-            asset winTotal = contestPrize - feeAmount;
-            asset prizeRemainder = contestPrize;
-
-            safeint totalWinnersWeight(0);
-
-            auto rank = 1;
-            auto prize = levelItr->prizes.begin();
-            for(auto rankWinners = winners.rbegin(); rankWinners != winners.rend(); ++rankWinners) {
-               if (rank > levelItr->prizes.size()) {
-                  break;
+               profile_index profiles(_self, _self.value);
+               auto profileItr = profiles.find(winner);
+               if (profileItr == profiles.end()) {
+                  continue;
                }
 
-               for (auto const& winner : rankWinners->second) {
-                  totalWinnersWeight = totalWinnersWeight + safeint{*prize};
+               entries_index entries(_self, _self.value);
+               auto entryItr = entries.find(entryId);
+               if (entryItr == entries.end()) {
+                  continue;
                }
 
-               ++rank;
-               ++prize;
-            }
-
-            print("totalWinnersWeight: ", totalWinnersWeight.amount, ", winTotal: ", winTotal, ", fee: ", feeAmount, "\n");
-
-            if (winTotal.amount > 0 && totalWinnersWeight > 0) {
-               rank = 1;
-               prize = levelItr->prizes.begin();
-               for(auto rankWinners = winners.rbegin(); rankWinners != winners.rend(); ++rankWinners) {
-                  if (rank > levelItr->prizes.size()) {
-                     break;
-                  }
-
-                  for (auto const& winner : rankWinners->second) {
-                     safeint total = safeint{winTotal.amount} * safeint{*prize} / safeint{totalWinnersWeight};
-                     asset winnerPrize(total.amount, s);
-                     prizeRemainder -= winnerPrize;
-
-                     profile_index profiles(_self, _self.value);
-                     auto profileItr = profiles.find(winner);
-                     if (profileItr == profiles.end()) {
-                        continue;
+               if (winnerPrize.amount > 0) { 
+                  profiles.modify(profileItr, _self, [&](profile& row) {
+                     if (row.winnings.amount > 0) {
+                        row.winnings = row.winnings + winnerPrize;
+                     } else {
+                        row.winnings = winnerPrize;
                      }
+                  });
 
-                     print("sending to winner: ", profileItr->account, ", amt: ", winnerPrize, ", memo: ", contestItr->id, "\n");
-
-                     if (winnerPrize.amount > 0) { 
-                        profiles.modify(profileItr, _self, [&](profile& row) {
-                           if (row.winnings.amount > 0) {
-                              row.winnings = row.winnings + winnerPrize;
-                           } else {
-                              row.winnings = winnerPrize;
-                           }
-                        });
-                     }
-                  }
-
-                  ++rank;
-                  ++prize;
+                  entries.modify(entryItr, _self, [&](contestEntry& row) {
+                     row.prizeGiven = winnerPrize;
+                  });
                }
-
-               name feeacct(get_option(name{"feeacct"}));
-               std::string feeacctmemo = get_option(name{"feeacctmemo"});
-               print("feeacct: ", feeacct, ", memo: ", feeacctmemo, ", amount: ", prizeRemainder, "\n");
-               if (prizeRemainder.amount > 0) {
-                  action{
-                     permission_level{get_self(), name("active")},
-                     name("eosio.token"),
-                     name("transfer"),
-                     std::make_tuple(get_self(), feeacct, prizeRemainder, feeacctmemo)
-                  }.send();
-               }
-
-               contestsByEndtime.modify(contestItr, _self, [&](contest& row) {
-                  row.paid = true;
-               });
             }
+
+            name feeacct(get_option(name{"feeacct"}));
+            std::string feeacctmemo = get_option(name{"feeacctmemo"});
+            print("feeacct: ", feeacct, ", memo: ", feeacctmemo, ", amount: ", prizeRemainder, "\n");
+            if (prizeRemainder.amount > 0) {
+               action{
+                  permission_level{get_self(), name("active")},
+                  name("eosio.token"),
+                  name("transfer"),
+                  std::make_tuple(get_self(), feeacct, prizeRemainder, feeacctmemo)
+               }.send();
+            }
+
+            contestsByEndtime.modify(contestItr, _self, [&](contest& row) {
+               row.paid = true;
+            });
 
             hitBeginning = contestItr == contestsByEndtime.begin();
             if (!hitBeginning) {
                contestItr--;
             }
          }              
+      }
+
+      template <typename contestItrT>
+      std::tuple<std::list<std::tuple<uint64_t, uint64_t, asset>>, asset> getContestWinners(contestItrT contestItr) {
+         print("getContestWinners contest id: ", contestItr->id, "\n");
+         entries_index entries(_self, _self.value);
+         auto entriesByContest = entries.get_index<name("bycontest")>();
+         auto contestEntriesItr = entriesByContest.lower_bound(contestItr->id);
+         level_index levels(_self, _self.value);
+         auto levelItr = levels.find(contestItr->levelId.value);
+
+         symbol s(get_option(name{'currency'}), 4);
+
+         asset contestPrize(0, s);
+         std::map<uint64_t, std::list<std::tuple<uint64_t, uint64_t>>> winners;
+         uint64_t votes = 0;
+
+         if (contestItr->fixedPrize > 0) {
+            contestPrize = asset{contestItr->fixedPrize, s};
+         }
+
+         // sum amount of all entry within contest & find winner(s)
+         for (auto entryItr = contestEntriesItr; entryItr->contestId == contestItr->id && entryItr != entriesByContest.end(); entryItr++) {
+            if (entryItr->block) { continue; }
+
+            print("user: ", entryItr->userId, " votes: ", entryItr->votes, " amount: ", entryItr->amount, "\n");
+            if (contestItr->fixedPrize == 0) {
+               contestPrize += asset(entryItr->amount, s);
+            }
+            std::list<std::tuple<uint64_t, uint64_t>> winnersByVotes; 
+            if(winners.find(entryItr->votes) != winners.end()) {
+               winnersByVotes = winners[entryItr->votes];
+               winnersByVotes.push_back(std::make_tuple(entryItr->userId.value, entryItr->id.value));
+            } else {
+               winnersByVotes = {std::make_tuple(entryItr->userId.value, entryItr->id.value)};
+            }
+            winners[entryItr->votes] = winnersByVotes;
+         }
+
+         print("level fee: ", levelItr->fee, "\n");
+         check(levelItr->fee < 1000, "interval error: fee is too large, must be below 100%");
+         asset feeAmount = contestPrize * levelItr->fee / 1000;
+         if (contestItr->fixedPrize > 0) {
+            feeAmount.set_amount(0);
+         }
+         asset winTotal = contestPrize - feeAmount;
+         asset prizeRemainder = contestPrize;
+
+         safeint totalWinnersWeight(0);
+
+         auto rank = 1;
+         auto prize = levelItr->prizes.begin();
+         for(auto rankWinners = winners.rbegin(); rankWinners != winners.rend(); ++rankWinners) {
+            if (rank > levelItr->prizes.size()) {
+               break;
+            }
+
+            for (auto const& winner : rankWinners->second) {
+               totalWinnersWeight = totalWinnersWeight + safeint{*prize};
+            }
+
+            ++rank;
+            ++prize;
+         }
+
+         print("totalWinnersWeight: ", totalWinnersWeight.amount, ", winTotal: ", winTotal, ", fee: ", feeAmount, "\n");
+
+         std::list<std::tuple<uint64_t, uint64_t, asset>> results;
+
+         if (winTotal.amount > 0 && totalWinnersWeight > 0) {
+            rank = 1;
+            prize = levelItr->prizes.begin();
+            for(auto rankWinners = winners.rbegin(); rankWinners != winners.rend(); ++rankWinners) {
+               if (rank > levelItr->prizes.size()) {
+                  break;
+               }
+
+               for (auto const& winnerRes : rankWinners->second) {
+                  auto winner = std::get<0>(winnerRes);
+                  auto entryId = std::get<1>(winnerRes);
+                  safeint total = safeint{winTotal.amount} * safeint{*prize} / safeint{totalWinnersWeight};
+                  asset winnerPrize(total.amount, s);
+                  prizeRemainder -= winnerPrize;
+
+                  results.push_back(std::make_tuple(winner, entryId, winnerPrize));
+               }
+
+               ++rank;
+               ++prize;
+            }
+         }
+
+         return std::make_tuple(results, prizeRemainder);
       }
 
       /*
