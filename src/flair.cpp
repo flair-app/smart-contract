@@ -477,10 +477,6 @@ class [[eosio::contract("flair")]] flair : public contract {
          contest_index contests(_self, _self.value);
          auto contestItr = contests.find(entryItr->contestId);
 
-         uint32_t now = eosio::current_time_point().sec_since_epoch();
-         bool contestEnded = now > contestItr->endtime();
-         std::tuple<std::list<std::tuple<uint64_t, asset>>, asset> oldWinnerResults;
-
          entries.modify(entryItr, _self, [&](contestEntry& row) {
             row.block = 1;
          });
@@ -708,8 +704,8 @@ class [[eosio::contract("flair")]] flair : public contract {
          print("distributeContestWinnings completed \n");
          checkUnavailablePriceEntries();
          print("checkUnavailablePriceEntries completed \n");
-         // archiveEntries();
-         // print("archiveEntries completed \n");
+         archiveContests();
+         print("archiveContests completed \n");
       }
 
       [[eosio::action]]
@@ -1139,9 +1135,9 @@ class [[eosio::contract("flair")]] flair : public contract {
       }
 
       /*
-         Archive Entries after set expiriation  - used within update
+         Archive Contests
       */
-      void archiveEntries() {
+      void archiveContests() {
          contest_index contests( _self, _self.value );
          auto contestsByEndtime = contests.get_index<name("byendtime")>();
 
@@ -1156,29 +1152,32 @@ class [[eosio::contract("flair")]] flair : public contract {
          uint64_t archSec = get_option_int(name{"entryarchsec"});
 
          int limitIndex = 0;
+         int limitMax = 1000;
          auto contestItr = contestsByEndtime.begin();
-         while(contestItr != contestsByEndtime.end() && limitIndex < 500 && contestItr->createdAt <= now - archSec) {
+         while(contestItr != contestsByEndtime.end() && limitIndex < limitMax && now > contestItr->endtime() + archSec) {
+            if (!contestItr->paid) continue;
+
             print("archiving contest ", contestItr->id, "\n");
             auto entryItr = entriesByContest.lower_bound(contestItr->id);
 
-            while(entryItr != entriesByContest.end() && limitIndex < 500) {
+            while(entryItr != entriesByContest.end() && limitIndex < limitMax && entryItr->contestId == contestItr->id) {
                print("archiving entry ", entryItr->id, "\n");
 
                auto voteItr = votesByEntry.lower_bound(entryItr->id.value);
-               while(voteItr != votesByEntry.end() && limitIndex < 500 && voteItr->entryId == entryItr->id) {
+               while(voteItr != votesByEntry.end() && limitIndex < limitMax && voteItr->entryId == entryItr->id) {
                   print("archive vote ", voteItr->id, "\n");
                   voteItr = votesByEntry.erase(voteItr);
                   limitIndex++;
                }
 
-               if (limitIndex < 500) {
+               if (limitIndex < limitMax) {
                   print("archive entry ", entryItr->id, "\n");
                   entryItr = entriesByContest.erase(entryItr);
                   limitIndex++;
                }
             }
 
-            if (limitIndex < 500) {
+            if (limitIndex < limitMax) {
                print("archive contest ", contestItr->id, "\n");
                contestItr = contestsByEndtime.erase(contestItr);
                limitIndex++;
@@ -1186,8 +1185,8 @@ class [[eosio::contract("flair")]] flair : public contract {
          }
 
          auto entryItr2 = entriesByCreatedAt.begin();
-         while(entryItr2 != entriesByCreatedAt.end() && limitIndex < 500 && entryItr2->createdAt <= now - archSec) {
-            if (entryItr2->contestId == 0) {
+         while(entryItr2 != entriesByCreatedAt.end() && limitIndex < limitMax && entryItr2->createdAt + (24 * 60 * 60) <= now) {
+            if (entryItr2->contestId == 0 && entryItr2->amount == 0) {
                print("archive entry without contest ", entryItr2->id, "\n");
                entryItr2 = entriesByCreatedAt.erase(entryItr2);
                limitIndex++;
