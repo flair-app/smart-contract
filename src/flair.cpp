@@ -111,6 +111,7 @@ class [[eosio::contract("flair")]] flair : public contract {
          uint32_t fixedPrize;
          uint32_t allowedSimultaneousContests;
          uint32_t voteStartUTCHour;
+         uint32_t minParticipant;
       };
 
       [[eosio::action]]
@@ -120,6 +121,8 @@ class [[eosio::contract("flair")]] flair : public contract {
          level_index levels( _self, _self.value );
 
          auto iterator = levels.find(id.value);
+         check(data.minParticipant > 0 && data.voteStartUTCHour > 0, "cannot use both voteStartUTCHour & minParticipant");
+
          levels.modify(iterator, _self, [&](level& row) {
             row.id = id;
             row.name = data.name;
@@ -133,6 +136,27 @@ class [[eosio::contract("flair")]] flair : public contract {
             row.fixedPrize = data.fixedPrize;
             row.allowedSimultaneousContests = data.allowedSimultaneousContests;
             row.voteStartUTCHour = data.voteStartUTCHour;
+            row.minParticipant = data.minParticipant;
+         });
+      }
+
+      /*
+         EDIT CONTEST
+      */
+      struct editcntstargs {
+         uint32_t minParticipant;
+      };
+
+      [[eosio::action]]
+      void editcntst(name id,  editcntstargs data) {
+         require_auth( _self );
+
+         contest_index contests( _self, _self.value );
+
+         auto iterator = contests.find(id.value);
+
+         contests.modify(iterator, _self, [&](contest& row) {
+            row.minParticipant = data.minParticipant;
          });
       }
 
@@ -745,6 +769,7 @@ class [[eosio::contract("flair")]] flair : public contract {
          uint32_t fixedPrize;
          uint32_t allowedSimultaneousContests;
          uint32_t voteStartUTCHour;
+         uint32_t minParticipant;
 
          uint64_t primary_key() const { return id.value; }
       };
@@ -890,10 +915,22 @@ class [[eosio::contract("flair")]] flair : public contract {
          uint32_t fixedPrize;
          uint32_t voteStartUTCHour;
          bool paid;
+         uint32_t minParticipant;
+         uint32_t lastEntryAddedAt;
 
          uint64_t primary_key() const { return id; }
          uint128_t bylevel() const { return composite_key(levelId.value, submissionsClosed); }
          uint64_t votestarttime() const {
+            if (minParticipant > 0) {
+               if (minParticipant > participantCount) {
+                  return 253370764800; // Jan 1, 9999 @ 12:00:00 AM
+               } else if(lastEntryAddedAt > 0) {
+                  return lastEntryAddedAt;
+               } else {
+                  return (safeint{createdAt} + safeint{submissionPeriod}).amount;
+               }
+            }
+
             if (voteStartUTCHour == 0) {
                return (safeint{createdAt} + safeint{submissionPeriod}).amount;
             }
@@ -1387,7 +1424,13 @@ class [[eosio::contract("flair")]] flair : public contract {
             });
             byLevelIdx.modify(curContestItr, _self, [&](contest& row) {
                row.participantCount++;
+
+               if (row.minParticipants > 0 && now > row.createdAt + row.submissionPeriod) {
+                  row.lastEntryAddedAt = now;
+               }
             });
+
+            
 
             print(entryItr->id, " activated with contest id of ", curContestItr->id, "\n");
             return true;
@@ -1422,6 +1465,11 @@ class [[eosio::contract("flair")]] flair : public contract {
                row.fixedPrize = levelFixedPrizeCurrency.amount;
                row.voteStartUTCHour = levelItr->voteStartUTCHour;
                row.paid = false;
+               row.minParticipant = levelItr->minParticipant;
+
+               if (row.minParticipants > 0 && now > row.createdAt + row.submissionPeriod) {
+                  row.lastEntryAddedAt = now;
+               }
             });
 
             if(curContestItr != byLevelIdx.end()) {
