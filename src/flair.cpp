@@ -1152,7 +1152,7 @@ class [[eosio::contract("flair")]] flair : public contract {
          uint64_t archSec = get_option_int(name{"entryarchsec"});
 
          int limitIndex = 0;
-         int limitMax = 1000;
+         int limitMax = 500;
          auto contestItr = contestsByEndtime.begin();
          while(contestItr != contestsByEndtime.end() && limitIndex < limitMax && now > contestItr->endtime() + archSec) {
             if (!contestItr->paid) continue;
@@ -1184,12 +1184,14 @@ class [[eosio::contract("flair")]] flair : public contract {
             }
          }
 
-         auto entryItr2 = entriesByCreatedAt.begin();
-         while(entryItr2 != entriesByCreatedAt.end() && limitIndex < limitMax && entryItr2->createdAt + (24 * 60 * 60) <= now) {
+         auto entryItr2 = entriesByContest.begin();
+         while(entryItr2 != entriesByContest.end() && entryItr2->contestId == 0 && limitIndex < limitMax && entryItr2->createdAt + (24 * 60 * 60) <= now) {
             if (entryItr2->contestId == 0 && entryItr2->amount == 0) {
                print("archive entry without contest ", entryItr2->id, "\n");
-               entryItr2 = entriesByCreatedAt.erase(entryItr2);
+               entryItr2 = entriesByContest.erase(entryItr2);
                limitIndex++;
+            } else {
+               entryItr2++;
             }
          }
       }
