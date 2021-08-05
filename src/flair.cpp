@@ -1425,7 +1425,7 @@ class [[eosio::contract("flair")]] flair : public contract {
             byLevelIdx.modify(curContestItr, _self, [&](contest& row) {
                row.participantCount++;
 
-               if (row.minParticipants > 0 && now > row.createdAt + row.submissionPeriod) {
+               if (row.minParticipant > 0 && now > row.createdAt + row.submissionPeriod) {
                   row.lastEntryAddedAt = now;
                }
             });
@@ -1467,7 +1467,7 @@ class [[eosio::contract("flair")]] flair : public contract {
                row.paid = false;
                row.minParticipant = levelItr->minParticipant;
 
-               if (row.minParticipants > 0 && now > row.createdAt + row.submissionPeriod) {
+               if (row.minParticipant > 0 && now > row.createdAt + row.submissionPeriod) {
                   row.lastEntryAddedAt = now;
                }
             });
