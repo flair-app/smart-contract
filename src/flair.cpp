@@ -71,6 +71,7 @@ class [[eosio::contract("flair")]] flair : public contract {
          uint32_t fixedPrize;
          uint32_t allowedSimultaneousContests;
          uint32_t voteStartUTCHour;
+         uint32_t minParticipant;
       };
 
       [[eosio::action]]
@@ -93,6 +94,7 @@ class [[eosio::contract("flair")]] flair : public contract {
             row.fixedPrize = params.fixedPrize;
             row.allowedSimultaneousContests = params.allowedSimultaneousContests;
             row.voteStartUTCHour = params.voteStartUTCHour;
+            row.minParticipant = data.minParticipant;
          });
       }
 
