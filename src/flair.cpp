@@ -121,7 +121,7 @@ class [[eosio::contract("flair")]] flair : public contract {
          level_index levels( _self, _self.value );
 
          auto iterator = levels.find(id.value);
-         check(data.minParticipant > 0 && data.voteStartUTCHour > 0, "cannot use both voteStartUTCHour & minParticipant");
+         check(data.minParticipant == 0 || data.voteStartUTCHour == 0, "cannot use both voteStartUTCHour & minParticipant");
 
          levels.modify(iterator, _self, [&](level& row) {
             row.id = id;
