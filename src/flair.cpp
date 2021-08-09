@@ -94,7 +94,7 @@ class [[eosio::contract("flair")]] flair : public contract {
             row.fixedPrize = params.fixedPrize;
             row.allowedSimultaneousContests = params.allowedSimultaneousContests;
             row.voteStartUTCHour = params.voteStartUTCHour;
-            row.minParticipant = data.minParticipant;
+            row.minParticipant = params.minParticipant;
          });
       }
 
