@@ -361,24 +361,40 @@ class [[eosio::contract("flair")]] flair : public contract {
          print("levelContestCount:", levelContestCount, "\n");
          check(levelItr->allowedSimultaneousContests == 0 || levelContestCount < levelItr->allowedSimultaneousContests, "This level is full");
 
+         uint32_t now = eosio::current_time_point().sec_since_epoch();
+
+         // get contest interator
+         contest_index contests(_self, _self.value);
+         auto byLevelIdx = contests.get_index<name("bylevel")>();
+         uint64_t submissionsClosed = false;
+         auto curContestItr = byLevelIdx.lower_bound(composite_key(params.levelId.value, submissionsClosed));
+
+         uint64_t contestPrice = 0;
+
+         bool curContestValid = (
+            curContestItr != byLevelIdx.end()
+            && curContestItr->levelId == params.levelId
+            && curContestItr->participantCount < curContestItr->participantLimit
+            && now <= curContestItr->votestarttime()
+         );
+
          if (levelItr->fixedPrize > 0) {
             auto prizefund = get_option_int(name{"prizefund"});
-            check(prizefund >= usdToCurrencyAmount(levelItr->fixedPrize), "Not enough money in prize fund to pay out prize.");
+            print("curContestValid: ", curContestValid, "\n");
+            print("enough in prize fund: ", prizefund >= usdToCurrencyAmount(levelItr->fixedPrize), "\n");
+            check(curContestValid || prizefund >= usdToCurrencyAmount(levelItr->fixedPrize), "Not enough money in prize fund to pay out prize.");
          }
 
          entries_index entries(_self, _self.value);
 
          auto byUserIdAndLevelIdIdx = entries.get_index<name("byuserandlvl")>();         
          auto itr = byUserIdAndLevelIdIdx.find(composite_key(params.userId.value, params.levelId.value, true));
-         
-         contest_index contests(_self, _self.value);
 
          // 1. get by index with UserId, LevelId, and open = 1
          // 2. check if is actually open or not, mark open = 0 if so
          if(itr != byUserIdAndLevelIdIdx.end() && itr->contestId > 0) {
             auto contestItr = contests.find(itr->contestId);
             if (contestItr != contests.end()) {
-               uint32_t now = eosio::current_time_point().sec_since_epoch();
                check(now > contestItr->votestarttime(), "You've already entered this contest. You can only submit one entry per contest. (entryId: " + params.id.to_string() + ")");
 
                byUserIdAndLevelIdIdx.modify(itr, _self, [&](contestEntry& row) {
@@ -924,10 +940,10 @@ class [[eosio::contract("flair")]] flair : public contract {
          uint128_t bylevel() const { return composite_key(levelId.value, submissionsClosed); }
          uint64_t votestarttime() const {
             if (minParticipant > 0) {
-               if (minParticipant > participantCount) {
-                  return 253370764800; // Jan 1, 9999 @ 12:00:00 AM
-               } else if(lastEntryAddedAt > 0) {
+               if(lastEntryAddedAt > 0) {
                   return lastEntryAddedAt;
+               } else if (minParticipant > participantCount) {
+                  return 253370764800; // Jan 1, 9999 @ 12:00:00 AM
                } else {
                   return (safeint{createdAt} + safeint{submissionPeriod}).amount;
                }
@@ -1351,11 +1367,7 @@ class [[eosio::contract("flair")]] flair : public contract {
          auto curContestItr = byLevelIdx.lower_bound(composite_key(entryItr->levelId.value, submissionsClosed));
 
          uint64_t contestPrice = 0;
-         
-         // print("curContest: ", curContestItr->id, " ", curContestItr->levelId, " ", curContestItr->participantCount, "\n");
-         // print("curContest Not End: ", curContestItr != byLevelIdx.end(), "\n");
-         // print("levelId Matches: ", curContestItr->levelId == entryItr->levelId, "\n");
-         // print("contest not full: ", curContestItr->participantCount < curContestItr->participantLimit, "\n");
+
          bool curContestValid = (
             curContestItr != byLevelIdx.end()
             && curContestItr->levelId == entryItr->levelId
@@ -1427,7 +1439,7 @@ class [[eosio::contract("flair")]] flair : public contract {
             byLevelIdx.modify(curContestItr, _self, [&](contest& row) {
                row.participantCount++;
 
-               if (row.minParticipant > 0 && now > row.createdAt + row.submissionPeriod) {
+               if (row.minParticipant == row.participantCount && now > row.createdAt + row.submissionPeriod) {
                   row.lastEntryAddedAt = now;
                }
             });
@@ -1469,7 +1481,7 @@ class [[eosio::contract("flair")]] flair : public contract {
                row.paid = false;
                row.minParticipant = levelItr->minParticipant;
 
-               if (row.minParticipant > 0 && now > row.createdAt + row.submissionPeriod) {
+               if (row.minParticipant == row.participantCount && now > row.createdAt + row.submissionPeriod) {
                   row.lastEntryAddedAt = now;
                }
             });
