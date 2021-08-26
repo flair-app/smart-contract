@@ -237,6 +237,8 @@ class ContestActionsUnitTest(unittest.TestCase):
                 "fixedPrize": 0,
                 "allowedSimultaneousContests": 0,
                 "voteStartUTCHour": 0,
+                "minParticipant": 0,
+                "minParticipant": 0,
             }], 
             permission=(HOST, Permission.ACTIVE)
         )
@@ -258,6 +260,7 @@ class ContestActionsUnitTest(unittest.TestCase):
                 "fixedPrize": 0,
                 "allowedSimultaneousContests": 1,
                 "voteStartUTCHour": 12,
+                "minParticipant": 0,
             }], 
             permission=(HOST, Permission.ACTIVE)
         )
@@ -270,7 +273,7 @@ class ContestActionsUnitTest(unittest.TestCase):
                 "id":self.levelId3,
                 "name":"Gold 3",
                 "categoryId": "music",
-                "price": 1000,
+                "price": 0,
                 "participantLimit": 2,
                 "submissionPeriod": 2,
                 "votePeriod": 2,
@@ -279,6 +282,7 @@ class ContestActionsUnitTest(unittest.TestCase):
                 "fixedPrize": 1000,
                 "allowedSimultaneousContests": 0,
                 "voteStartUTCHour": 0,
+                "minParticipant": 0,
             }], 
             permission=(HOST, Permission.ACTIVE)
         )
@@ -345,6 +349,9 @@ class ContestActionsUnitTest(unittest.TestCase):
             "priceUnavailable": 0,
             "votes": 0,
             "open": 1,
+            "block": 0,
+            "prizeGiven": "0 ",
+            "prizeRevoked": 0,
         })
 
     def test_enter_contest_requires_auth_of_user(self):
@@ -448,6 +455,9 @@ class ContestActionsUnitTest(unittest.TestCase):
             "videoHash1080p": "450fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9",
             "coverHash": "550fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9",
             "votes": 0,
+            "block": 0,
+            "prizeGiven": "0 ",
+            "prizeRevoked": 0,
         })
 
         self.assertGreaterEqual(entry2["createdAt"], now - 1)
@@ -465,6 +475,9 @@ class ContestActionsUnitTest(unittest.TestCase):
             "videoHash1080p": videoHash1080p,
             "coverHash": coverHash,
             "votes": 0,
+            "block": 0,
+            "prizeGiven": "0 ",
+            "prizeRevoked": 0,
         })
 
     def test_entry_payment_activates_entry_in_contest(self):
@@ -722,6 +735,93 @@ class ContestActionsUnitTest(unittest.TestCase):
         now = int(time.time())
         self.assertEqual(contestData["createdAt"], entry4CreatedAt)
     
+    def test_entry_payment_two_levels_doesnt_mark_submissionsClosed(self):
+        videoHash360p = "150fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+        videoHash480p = "250fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+        videoHash720p = "350fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+        videoHash1080p = "450fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+        coverHash = "550fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+
+        if self.levelId < self.levelId2:
+            firstLevel = self.levelId2
+            secondLevel = self.levelId
+        else :
+            firstLevel = self.levelId
+            secondLevel = self.levelId2
+
+        # verify activates and creates contest when no existing contest
+        id = "myentry115"
+        HOST.push_action(
+            "entercontest",
+            [{
+                "id":id,
+                "userId": self.userId,
+                "levelId": firstLevel,
+                "videoHash360p": videoHash360p,
+                "videoHash480p": videoHash480p,
+                "videoHash720p": videoHash720p,
+                "videoHash1080p": videoHash1080p,
+                "coverHash": coverHash,
+            }],
+            permission=(ALICE, Permission.ACTIVE)
+        )
+
+        TOKENHOST.push_action(
+            "transfer",
+            {
+                "from": ALICE,
+                "to": HOST,
+                "quantity": "2.0000 EOS", 
+                "memo": id,
+            },
+            force_unique=True,
+            permission=(ALICE, Permission.ACTIVE)
+        )
+
+        entriesRes = HOST.table("entries", HOST, lower=id, key_type="name")
+        entry = entriesRes.json["rows"][0]
+        contestId1 = entry["contestId"]
+        
+        id = "myentry121"
+        HOST.push_action(
+            "entercontest",
+            [{
+                "id":id,
+                "userId": self.userId2,
+                "levelId": secondLevel,
+                "videoHash360p": videoHash360p,
+                "videoHash480p": videoHash480p,
+                "videoHash720p": videoHash720p,
+                "videoHash1080p": videoHash1080p,
+                "coverHash": coverHash,
+            }],
+            permission=(BOB, Permission.ACTIVE)
+        )
+
+        TOKENHOST.push_action(
+            "transfer",
+            {
+                "from": BOB,
+                "to": HOST,
+                "quantity": "2.0000 EOS", 
+                "memo": id,
+            },
+            force_unique=True,
+            permission=(BOB, Permission.ACTIVE)
+        )
+
+        entriesRes = HOST.table("entries", HOST, lower=id, key_type="name")
+        entry = entriesRes.json["rows"][0]
+        contestId2 = entry["contestId"]
+
+        contestsRes1 = HOST.table("contests", HOST, lower=str(contestId1))
+        contestData1 = contestsRes1.json["rows"][0]
+
+        contestsRes2 = HOST.table("contests", HOST, lower=str(contestId2))
+        contestData2 = contestsRes2.json["rows"][0]
+        self.assertEqual(contestData1["submissionsClosed"], 0)
+        self.assertEqual(contestData2["submissionsClosed"], 0)
+
     def test_entry_payment_doesnt_activate_when_entry_expired(self):
         videoHash360p = "150fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
         videoHash480p = "250fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
@@ -1679,6 +1779,55 @@ class ContestActionsUnitTest(unittest.TestCase):
                 }],
                 permission=(ALICE, Permission.ACTIVE)
             )
+        
+    def test_entercontest_no_errors_when_not_enough_in_prizefund_but_open_contest(self):
+        TOKENHOST.push_action(  
+            "transfer",
+            {
+                "from": ALICE,
+                "to": HOST,
+                "quantity": "3.0000 EOS", 
+                "memo": "prizefund",
+            },
+            force_unique=True,
+            permission=(ALICE, Permission.ACTIVE)
+        )
+
+        videoHash720p = "350fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+        videoHash1080p = "450fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+        coverHash = "550fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+
+        id = "myentry555"
+        HOST.push_action(
+            "entercontest",
+            [{
+                "id":id,
+                "userId": self.userId,
+                "levelId": self.levelId3,
+                "videoHash720p": videoHash720p,
+                "videoHash1080p": videoHash1080p,
+                "coverHash": coverHash,
+            }],
+            permission=(ALICE, Permission.ACTIVE)
+        )
+
+        videoHash720p = "350fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+        videoHash1080p = "450fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+        coverHash = "550fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
+
+        id = "myentry5551"
+        HOST.push_action(
+            "entercontest",
+            [{
+                "id":id,
+                "userId": self.userId2,
+                "levelId": self.levelId3,
+                "videoHash720p": videoHash720p,
+                "videoHash1080p": videoHash1080p,
+                "coverHash": coverHash,
+            }],
+            permission=(BOB, Permission.ACTIVE)
+        )
 
     def test_new_contest_using_voteStartUTCHour_has_proper_starttime(self):
         videoHash720p = "350fe755a7ef10e2dfdca952bb877cc023e9a4f3f2d896455e62cb6a442f5bb9"
